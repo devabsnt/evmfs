@@ -166,7 +166,7 @@ export default function App() {
     const rpcUrl = customRpcUrl || DEFAULT_RPC_URLS[chainId] || "";
 
     try {
-      if (!isResume && fee > 0n && FEE_RECIPIENT !== "0x0000000000000000000000000000000000000000") {
+      if (!isResume && fee > 0n) {
         if (uploadMode === "privatekey" && pkConfig) {
           const { ethers } = await import("ethers");
           const provider = new ethers.JsonRpcProvider(rpcUrl);
