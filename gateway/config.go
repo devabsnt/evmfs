@@ -43,6 +43,10 @@ func LoadConfig() (*Config, error) {
 		cfg.ContractAddress = contractAddr
 	}
 
+	if staticDir := os.Getenv("STATIC_DIR"); staticDir != "" {
+		cfg.StaticDir = staticDir
+	}
+
 	if rpcURLsEnv := os.Getenv("RPC_URLS"); rpcURLsEnv != "" {
 		chains := strings.Split(rpcURLsEnv, ";")
 		for _, chain := range chains {
