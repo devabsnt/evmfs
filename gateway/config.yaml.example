@@ -1,0 +1,9 @@
+port: "8080"
+cache_dir: "./cache"
+contract_address: "0xYourContractAddressHere"
+rpc_urls:
+  "1":
+    - "https://mainnet.infura.io/v3/YOUR_INFURA_KEY"
+  "11155111":
+    - "https://sepolia.infura.io/v3/YOUR_INFURA_KEY"
+    - "https://rpc.sepolia.org"
