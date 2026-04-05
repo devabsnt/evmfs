@@ -86,7 +86,7 @@ export function UploadProgress({
           )}
 
           <div style={{ color: "#6b7280", fontSize: 13 }}>
-            {completedFiles} / {totalFiles} files uploaded
+            {completedFiles} / {totalFiles} parts uploaded
           </div>
         </>
       )}

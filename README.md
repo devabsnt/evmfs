@@ -55,7 +55,7 @@ This is the same pattern Uniswap uses: free contract, hosted frontend earns its 
 
 ### Where it doesn't
 
-- **Large files** (>~100 KB per file). A 1 MB file costs roughly $65–$300+ at typical gas prices. For video, audio, or high-res imagery, evaluate whether the trust tradeoff of an external storage network is acceptable for your use case — EVMFS is optimized for small files where on-chain permanence is worth a premium.
+- **Large files** at scale. Files over ~100 KB are chunked across multiple transactions (the client splits, the gateway reassembles — no contract change required), so size isn't a hard limit, but cost scales linearly with bytes. A 1 MB file costs roughly $65–$300+ at typical gas prices; a 3 MB file runs into the low hundreds of dollars even at moderate gas. For video, audio, or high-res imagery at volume, evaluate whether the trust tradeoff of an external storage network is acceptable — EVMFS is optimized for cases where on-chain permanence is worth a premium per byte.
 - **Mutable content**. EVMFS has no delete, no update. Content addressing is the feature.
 - **Private data**. Event logs are public. Encrypt first if you need privacy.
 

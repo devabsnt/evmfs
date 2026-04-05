@@ -41,16 +41,27 @@ export interface FileEntry {
   estimatedCompressedSize: number;
 }
 
+export interface UploadUnit {
+  fileIndex: number;
+  chunkIndex: number;
+  totalChunks: number;
+  name: string;
+  byteLength: number;
+  file: File;
+  byteOffset: number;
+}
+
 export interface Batch {
-  files: FileEntry[];
+  units: UploadUnit[];
   estimatedGas: number;
+  byteSize: number;
 }
 
 const BASE_TX_GAS = 21_000;
 const PER_FILE_OVERHEAD = 5_000;
 const PER_BYTE_GAS = 26;
 const BATCH_CALL_OVERHEAD = 10_000;
-const MAX_BATCH_BYTES = 100_000;
+export const MAX_BATCH_BYTES = 100_000;
 const READ_CONCURRENCY = 6;
 const RECEIPT_TIMEOUT = 180_000;
 const BATCH_RETRIES = 3;
@@ -58,11 +69,19 @@ const GAS_MULTIPLIER = 3;
 
 const PROGRESS_KEY = "evmfs_upload_progress";
 
+export interface ConfirmedUnit {
+  fileIndex: number;
+  chunkIndex: number;
+  totalChunks: number;
+  hash: string;
+  block: number;
+}
+
 export interface SavedProgress {
   fileNames: string[];
   chainId: number;
   contractAddress: string;
-  confirmed: { index: number; hash: string; block: number }[];
+  confirmed: ConfirmedUnit[];
   gasUsed: string;
   savedAt: number;
 }
@@ -77,12 +96,26 @@ export function loadProgress(): SavedProgress | null {
   try {
     const raw = localStorage.getItem(PROGRESS_KEY);
     if (!raw) return null;
-    const p = JSON.parse(raw) as SavedProgress;
+    const p = JSON.parse(raw) as SavedProgress & {
+      confirmed: Array<ConfirmedUnit | { index: number; hash: string; block: number }>;
+    };
     if (Date.now() - p.savedAt > 24 * 60 * 60 * 1000) {
       clearProgress();
       return null;
     }
-    return p;
+    // Migrate legacy format (index-only, no chunking)
+    const migrated: ConfirmedUnit[] = p.confirmed.map((c) => {
+      if ("fileIndex" in c) return c;
+      const legacy = c as { index: number; hash: string; block: number };
+      return {
+        fileIndex: legacy.index,
+        chunkIndex: 0,
+        totalChunks: 1,
+        hash: legacy.hash,
+        block: legacy.block,
+      };
+    });
+    return { ...p, confirmed: migrated };
   } catch {
     return null;
   }
@@ -109,33 +142,67 @@ export function estimateFileGas(fileSize: number): number {
   return fileSize * PER_BYTE_GAS + PER_FILE_OVERHEAD;
 }
 
-export function packBatches(files: FileEntry[], gasLimit: number): Batch[] {
+export function expandFilesToUnits(files: FileEntry[]): UploadUnit[] {
+  const units: UploadUnit[] = [];
+  for (const f of files) {
+    const size = f.file.size;
+    if (size <= MAX_BATCH_BYTES) {
+      units.push({
+        fileIndex: f.index,
+        chunkIndex: 0,
+        totalChunks: 1,
+        name: f.name,
+        byteLength: size,
+        file: f.file,
+        byteOffset: 0,
+      });
+    } else {
+      const totalChunks = Math.ceil(size / MAX_BATCH_BYTES);
+      for (let i = 0; i < totalChunks; i++) {
+        const offset = i * MAX_BATCH_BYTES;
+        const end = Math.min(offset + MAX_BATCH_BYTES, size);
+        units.push({
+          fileIndex: f.index,
+          chunkIndex: i,
+          totalChunks,
+          name: `${f.name}#${i + 1}/${totalChunks}`,
+          byteLength: end - offset,
+          file: f.file,
+          byteOffset: offset,
+        });
+      }
+    }
+  }
+  return units;
+}
+
+export function packBatches(units: UploadUnit[], gasLimit: number): Batch[] {
   const batches: Batch[] = [];
-  let currentBatch: FileEntry[] = [];
+  let currentUnits: UploadUnit[] = [];
   let currentGas = BASE_TX_GAS + BATCH_CALL_OVERHEAD;
   let currentBytes = 0;
 
-  for (const file of files) {
-    const fileGas = estimateFileGas(file.estimatedCompressedSize);
-    const fileBytes = file.estimatedCompressedSize;
+  for (const unit of units) {
+    const unitGas = estimateFileGas(unit.byteLength);
+    const unitBytes = unit.byteLength;
 
     if (
-      currentBatch.length > 0 &&
-      (currentGas + fileGas > gasLimit || currentBytes + fileBytes > MAX_BATCH_BYTES)
+      currentUnits.length > 0 &&
+      (currentGas + unitGas > gasLimit || currentBytes + unitBytes > MAX_BATCH_BYTES)
     ) {
-      batches.push({ files: [...currentBatch], estimatedGas: currentGas });
-      currentBatch = [];
+      batches.push({ units: [...currentUnits], estimatedGas: currentGas, byteSize: currentBytes });
+      currentUnits = [];
       currentGas = BASE_TX_GAS + BATCH_CALL_OVERHEAD;
       currentBytes = 0;
     }
 
-    currentBatch.push(file);
-    currentGas += fileGas;
-    currentBytes += fileBytes;
+    currentUnits.push(unit);
+    currentGas += unitGas;
+    currentBytes += unitBytes;
   }
 
-  if (currentBatch.length > 0) {
-    batches.push({ files: currentBatch, estimatedGas: currentGas });
+  if (currentUnits.length > 0) {
+    batches.push({ units: currentUnits, estimatedGas: currentGas, byteSize: currentBytes });
   }
 
   return batches;
@@ -165,28 +232,63 @@ async function gzipCompress(data: Uint8Array): Promise<Uint8Array> {
   return result;
 }
 
-async function readFile(file: File): Promise<Uint8Array> {
-  const buffer = await file.arrayBuffer();
+async function readUnit(unit: UploadUnit): Promise<Uint8Array> {
+  const blob = unit.file.slice(unit.byteOffset, unit.byteOffset + unit.byteLength);
+  const buffer = await blob.arrayBuffer();
   return new Uint8Array(buffer);
 }
 
-export interface ManifestEntry {
-  h: string;
-  b: number;
+type ManifestOutputEntry =
+  | { h: string; b: number }
+  | { p: { h: string; b: number }[] };
+
+export type { ManifestOutputEntry };
+
+export function buildManifestEntries(
+  fileCount: number,
+  confirmed: ConfirmedUnit[]
+): ManifestOutputEntry[] {
+  const byFile = new Map<number, ConfirmedUnit[]>();
+  for (const c of confirmed) {
+    const list = byFile.get(c.fileIndex) ?? [];
+    list.push(c);
+    byFile.set(c.fileIndex, list);
+  }
+  const out: ManifestOutputEntry[] = [];
+  for (let i = 0; i < fileCount; i++) {
+    const chunks = (byFile.get(i) ?? []).slice();
+    chunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
+    if (chunks.length === 0) {
+      throw new Error(`missing chunks for file index ${i}`);
+    }
+    if (chunks.length === 1 && chunks[0].totalChunks === 1) {
+      out.push({ h: chunks[0].hash, b: chunks[0].block });
+    } else {
+      out.push({ p: chunks.map((c) => ({ h: c.hash, b: c.block })) });
+    }
+  }
+  return out;
 }
 
-export function buildManifestJson(entries: ManifestEntry[]): string {
-  return JSON.stringify(entries);
+export function getDisplayHash(entry: ManifestOutputEntry): string {
+  if ("p" in entry) {
+    return entry.p[0]?.h ?? "";
+  }
+  return entry.h;
 }
 
 export interface UploadCallbacks {
-  onBatchStart: (batchIndex: number, totalBatches: number, fileCount: number) => void;
+  onBatchStart: (batchIndex: number, totalBatches: number, unitCount: number) => void;
   onBatchSent: (batchIndex: number, txHash: string) => void;
   onBatchConfirmed: (batchIndex: number, gasUsed: bigint) => void;
-  onFileHashed: (fileName: string, hash: string) => void;
+  onFileHashed: (unitName: string, hash: string) => void;
   onManifestUploading: () => void;
   onComplete: (manifestHash: string, baseUri: string, manifestJson: string, totalGasUsed: bigint) => void;
   onError: (error: string) => void;
+}
+
+function computeConfirmedKey(u: Pick<ConfirmedUnit, "fileIndex" | "chunkIndex">): string {
+  return `${u.fileIndex}:${u.chunkIndex}`;
 }
 
 export async function uploadFiles(
@@ -199,45 +301,41 @@ export async function uploadFiles(
   gatewayUrl: string,
   callbacks: UploadCallbacks,
   savedProgress?: SavedProgress | null
-): Promise<{ manifestHash: string; fileHashes: Map<number, string> }> {
-  const fileHashes = new Map<number, string>();
-  const fileBlocks = new Map<number, number>();
+): Promise<{ manifestHash: string; confirmed: ConfirmedUnit[] }> {
+  const confirmed = new Map<string, ConfirmedUnit>();
   const account = walletClient.account;
   if (!account) throw new Error("No account connected");
   let totalGasUsed = 0n;
 
-  const completedFileIndices = new Set<number>();
   if (savedProgress) {
     for (const c of savedProgress.confirmed) {
-      fileHashes.set(c.index, c.hash);
-      fileBlocks.set(c.index, c.block);
-      completedFileIndices.add(c.index);
+      confirmed.set(computeConfirmedKey(c), c);
     }
     totalGasUsed = BigInt(savedProgress.gasUsed);
-    console.log(`[evmfs] resuming: ${savedProgress.confirmed.length} files already confirmed`);
+    console.log(`[evmfs] resuming: ${savedProgress.confirmed.length} chunks already confirmed`);
   }
 
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
 
-    if (batch.files.every((f) => completedFileIndices.has(f.index))) {
+    if (batch.units.every((u) => confirmed.has(computeConfirmedKey(u)))) {
       console.log(`[evmfs] batch ${i + 1}/${batches.length}: skipped (already confirmed)`);
       callbacks.onBatchConfirmed(i, 0n);
-      for (const f of batch.files) callbacks.onFileHashed(f.name, fileHashes.get(f.index)!);
+      for (const u of batch.units) callbacks.onFileHashed(u.name, confirmed.get(computeConfirmedKey(u))!.hash);
       continue;
     }
 
-    callbacks.onBatchStart(i, batches.length, batch.files.length);
+    callbacks.onBatchStart(i, batches.length, batch.units.length);
 
-    const batchItems: { hex: Hex; hash: Hex; fileEntry: FileEntry }[] = [];
-    for (let j = 0; j < batch.files.length; j += READ_CONCURRENCY) {
-      const chunk = batch.files.slice(j, j + READ_CONCURRENCY);
+    const batchItems: { hex: Hex; hash: Hex; unit: UploadUnit }[] = [];
+    for (let j = 0; j < batch.units.length; j += READ_CONCURRENCY) {
+      const chunk = batch.units.slice(j, j + READ_CONCURRENCY);
       const results = await Promise.all(
-        chunk.map(async (f) => {
-          const raw = await readFile(f.file);
+        chunk.map(async (u) => {
+          const raw = await readUnit(u);
           const hex = toHex(raw);
           const hash = keccak256(hex);
-          return { hex, hash, fileEntry: f };
+          return { hex, hash, unit: u };
         })
       );
       batchItems.push(...results);
@@ -249,10 +347,10 @@ export async function uploadFiles(
 
     for (let attempt = 1; attempt <= BATCH_RETRIES; attempt++) {
       try {
-        console.log(`[evmfs] batch ${i + 1}/${batches.length}${attempt > 1 ? ` (retry ${attempt}/${BATCH_RETRIES})` : ""}: ${batch.files.length} files, ~${(calldataBytes / 1024).toFixed(1)} KB`);
+        console.log(`[evmfs] batch ${i + 1}/${batches.length}${attempt > 1 ? ` (retry ${attempt}/${BATCH_RETRIES})` : ""}: ${batch.units.length} chunks, ~${(calldataBytes / 1024).toFixed(1)} KB`);
 
         let txHash: Hex;
-        if (batch.files.length === 1) {
+        if (batch.units.length === 1) {
           const data = encodeFunctionData({ abi: EVMFS_ABI, functionName: "store", args: [hexData[0]] });
           txHash = await walletClient.sendTransaction({ to: contractAddress, data, gas, account, chain: walletClient.chain });
         } else {
@@ -260,7 +358,7 @@ export async function uploadFiles(
           txHash = await walletClient.sendTransaction({ to: contractAddress, data, gas, account, chain: walletClient.chain });
         }
 
-        const hashMap = new Map(batchItems.map((d) => [d.hash, d.fileEntry]));
+        const hashMap = new Map(batchItems.map((d) => [d.hash, d.unit]));
         callbacks.onBatchSent(i, txHash);
 
         const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash, timeout: RECEIPT_TIMEOUT });
@@ -277,11 +375,16 @@ export async function uploadFiles(
         for (const log of receipt.logs) {
           if (log.address.toLowerCase() === contractAddress.toLowerCase() && log.topics[1]) {
             const contentHash = log.topics[1];
-            const entry = hashMap.get(contentHash);
-            if (entry) {
-              fileHashes.set(entry.index, contentHash);
-              fileBlocks.set(entry.index, blockNumber);
-              callbacks.onFileHashed(entry.name, contentHash);
+            const unit = hashMap.get(contentHash);
+            if (unit) {
+              confirmed.set(computeConfirmedKey(unit), {
+                fileIndex: unit.fileIndex,
+                chunkIndex: unit.chunkIndex,
+                totalChunks: unit.totalChunks,
+                hash: contentHash,
+                block: blockNumber,
+              });
+              callbacks.onFileHashed(unit.name, contentHash);
             }
           }
         }
@@ -290,7 +393,7 @@ export async function uploadFiles(
           fileNames: files.map((f) => f.name),
           chainId,
           contractAddress,
-          confirmed: [...fileHashes.entries()].map(([idx, hash]) => ({ index: idx, hash, block: fileBlocks.get(idx)! })),
+          confirmed: [...confirmed.values()],
           gasUsed: totalGasUsed.toString(),
           savedAt: Date.now(),
         });
@@ -310,17 +413,11 @@ export async function uploadFiles(
 
   callbacks.onManifestUploading();
 
-  const missingIndices = files.filter((_, idx) => !fileHashes.has(idx)).map((_, idx) => idx);
-  if (missingIndices.length > 0) {
-    console.error(`[evmfs] missing hashes for ${missingIndices.length} files (indices: ${missingIndices.slice(0, 20).join(", ")}${missingIndices.length > 20 ? "…" : ""})`);
-  }
-  console.log(`[evmfs] uploading manifest for ${files.length} files (${fileHashes.size} hashes collected)`);
+  const confirmedList = [...confirmed.values()];
+  console.log(`[evmfs] uploading manifest for ${files.length} files (${confirmedList.length} chunks)`);
 
-  const manifestEntries: ManifestEntry[] = files.map((_, idx) => ({
-    h: fileHashes.get(idx)!,
-    b: fileBlocks.get(idx)!,
-  }));
-  const manifestJson = buildManifestJson(manifestEntries);
+  const manifestEntries = buildManifestEntries(files.length, confirmedList);
+  const manifestJson = JSON.stringify(manifestEntries);
   const manifestRaw = new TextEncoder().encode(manifestJson);
   const manifestBytes = await gzipCompress(manifestRaw);
   console.log(`[evmfs] manifest: ${manifestRaw.length} bytes → ${manifestBytes.length} bytes gzipped`);
@@ -354,7 +451,7 @@ export async function uploadFiles(
   const baseUri = `${gatewayUrl}/${chainId}/${manifestBlock}/${manifestHash}/`;
   callbacks.onComplete(manifestHash, baseUri, manifestJson, totalGasUsed);
 
-  return { manifestHash, fileHashes };
+  return { manifestHash, confirmed: confirmedList };
 }
 
 export async function uploadFilesWithPrivateKey(
@@ -367,7 +464,7 @@ export async function uploadFilesWithPrivateKey(
   gatewayUrl: string,
   callbacks: UploadCallbacks,
   savedProgress?: SavedProgress | null
-): Promise<{ manifestHash: string; fileHashes: Map<number, string> }> {
+): Promise<{ manifestHash: string; confirmed: ConfirmedUnit[] }> {
   const { ethers } = await import("ethers");
 
   const contractAbi = [
@@ -380,8 +477,7 @@ export async function uploadFilesWithPrivateKey(
   const provider = new ethers.JsonRpcProvider(rpcUrl);
   const wallet = new ethers.Wallet(privateKey, provider);
 
-  const fileHashes = new Map<number, string>();
-  const fileBlocks = new Map<number, number>();
+  const confirmed = new Map<string, ConfirmedUnit>();
   let nonce = await provider.getTransactionCount(wallet.address, "pending");
   const rawFeeData = await provider.getFeeData();
   const feeData = {
@@ -392,15 +488,12 @@ export async function uploadFilesWithPrivateKey(
   const contract = new ethers.Contract(contractAddress, contractAbi, wallet);
   let totalGasUsed = 0n;
 
-  const completedFileIndices = new Set<number>();
   if (savedProgress) {
     for (const c of savedProgress.confirmed) {
-      fileHashes.set(c.index, c.hash);
-      fileBlocks.set(c.index, c.block);
-      completedFileIndices.add(c.index);
+      confirmed.set(computeConfirmedKey(c), c);
     }
     totalGasUsed = BigInt(savedProgress.gasUsed);
-    console.log(`[evmfs] resuming: ${savedProgress.confirmed.length} files already confirmed`);
+    console.log(`[evmfs] resuming: ${savedProgress.confirmed.length} chunks already confirmed`);
   }
 
   console.log(`[evmfs] sending ${batches.length} batches sequentially via ${rpcUrl.split("/")[2]}, starting nonce: ${nonce}`);
@@ -408,23 +501,23 @@ export async function uploadFilesWithPrivateKey(
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
 
-    if (batch.files.every((f) => completedFileIndices.has(f.index))) {
+    if (batch.units.every((u) => confirmed.has(computeConfirmedKey(u)))) {
       console.log(`[evmfs] batch ${i + 1}/${batches.length}: skipped (already confirmed)`);
       callbacks.onBatchConfirmed(i, 0n);
-      for (const f of batch.files) callbacks.onFileHashed(f.name, fileHashes.get(f.index)!);
+      for (const u of batch.units) callbacks.onFileHashed(u.name, confirmed.get(computeConfirmedKey(u))!.hash);
       continue;
     }
 
-    callbacks.onBatchStart(i, batches.length, batch.files.length);
+    callbacks.onBatchStart(i, batches.length, batch.units.length);
 
-    const batchItems: { data: Uint8Array; hash: string; fileEntry: FileEntry }[] = [];
-    for (let j = 0; j < batch.files.length; j += READ_CONCURRENCY) {
-      const chunk = batch.files.slice(j, j + READ_CONCURRENCY);
+    const batchItems: { data: Uint8Array; hash: string; unit: UploadUnit }[] = [];
+    for (let j = 0; j < batch.units.length; j += READ_CONCURRENCY) {
+      const chunk = batch.units.slice(j, j + READ_CONCURRENCY);
       const items = await Promise.all(
-        chunk.map(async (f) => {
-          const raw = await readFile(f.file);
+        chunk.map(async (u) => {
+          const raw = await readUnit(u);
           const hash = ethers.keccak256(raw);
-          return { data: raw, hash, fileEntry: f };
+          return { data: raw, hash, unit: u };
         })
       );
       batchItems.push(...items);
@@ -436,11 +529,11 @@ export async function uploadFilesWithPrivateKey(
 
     for (let attempt = 1; attempt <= BATCH_RETRIES; attempt++) {
       try {
-        console.log(`[evmfs] batch ${i + 1}/${batches.length}${attempt > 1 ? ` (retry ${attempt}/${BATCH_RETRIES})` : ""}: ${batch.files.length} files, ~${(calldataBytes / 1024).toFixed(1)} KB, nonce: ${nonce}`);
+        console.log(`[evmfs] batch ${i + 1}/${batches.length}${attempt > 1 ? ` (retry ${attempt}/${BATCH_RETRIES})` : ""}: ${batch.units.length} chunks, ~${(calldataBytes / 1024).toFixed(1)} KB, nonce: ${nonce}`);
 
         let tx: Awaited<ReturnType<typeof contract.store>>;
         const overrides = { gasLimit, nonce, maxFeePerGas: feeData.maxFeePerGas, maxPriorityFeePerGas: feeData.maxPriorityFeePerGas };
-        if (batch.files.length === 1) {
+        if (batch.units.length === 1) {
           tx = await contract.store(fileData[0], overrides);
         } else {
           tx = await contract.storeBatch(fileData, overrides);
@@ -462,17 +555,22 @@ export async function uploadFilesWithPrivateKey(
         console.log(`[evmfs] batch ${i + 1} confirmed, block: ${blockNumber}, gasUsed: ${receipt.gasUsed}`);
         callbacks.onBatchConfirmed(i, BigInt(receipt.gasUsed.toString()));
 
-        const hashMap = new Map(batchItems.map((d) => [d.hash, d.fileEntry]));
+        const hashMap = new Map(batchItems.map((d) => [d.hash, d.unit]));
 
         for (const log of receipt.logs) {
           const parsed = contract.interface.parseLog({ topics: log.topics as string[], data: log.data });
           if (parsed && parsed.name === "Store") {
             const contentHash = parsed.args[0] as string;
-            const entry = hashMap.get(contentHash);
-            if (entry) {
-              fileHashes.set(entry.index, contentHash);
-              fileBlocks.set(entry.index, blockNumber);
-              callbacks.onFileHashed(entry.name, contentHash);
+            const unit = hashMap.get(contentHash);
+            if (unit) {
+              confirmed.set(computeConfirmedKey(unit), {
+                fileIndex: unit.fileIndex,
+                chunkIndex: unit.chunkIndex,
+                totalChunks: unit.totalChunks,
+                hash: contentHash,
+                block: blockNumber,
+              });
+              callbacks.onFileHashed(unit.name, contentHash);
             }
           }
         }
@@ -481,7 +579,7 @@ export async function uploadFilesWithPrivateKey(
           fileNames: files.map((f) => f.name),
           chainId,
           contractAddress,
-          confirmed: [...fileHashes.entries()].map(([idx, hash]) => ({ index: idx, hash, block: fileBlocks.get(idx)! })),
+          confirmed: [...confirmed.values()],
           gasUsed: totalGasUsed.toString(),
           savedAt: Date.now(),
         });
@@ -502,17 +600,11 @@ export async function uploadFilesWithPrivateKey(
 
   callbacks.onManifestUploading();
 
-  const missingIndices = files.filter((_, idx) => !fileHashes.has(idx)).map((_, idx) => idx);
-  if (missingIndices.length > 0) {
-    console.error(`[evmfs] missing hashes for ${missingIndices.length} files (indices: ${missingIndices.slice(0, 20).join(", ")}${missingIndices.length > 20 ? "…" : ""})`);
-  }
-  console.log(`[evmfs] uploading manifest for ${files.length} files (${fileHashes.size} hashes collected)`);
+  const confirmedList = [...confirmed.values()];
+  console.log(`[evmfs] uploading manifest for ${files.length} files (${confirmedList.length} chunks)`);
 
-  const manifestEntries: ManifestEntry[] = files.map((_, idx) => ({
-    h: fileHashes.get(idx)!,
-    b: fileBlocks.get(idx)!,
-  }));
-  const manifestJson = buildManifestJson(manifestEntries);
+  const manifestEntries = buildManifestEntries(files.length, confirmedList);
+  const manifestJson = JSON.stringify(manifestEntries);
   const manifestRaw = new TextEncoder().encode(manifestJson);
   const manifestBytes = await gzipCompress(manifestRaw);
   console.log(`[evmfs] manifest: ${manifestRaw.length} bytes → ${manifestBytes.length} bytes gzipped`);
@@ -545,5 +637,5 @@ export async function uploadFilesWithPrivateKey(
   const baseUri = `${gatewayUrl}/${chainId}/${manifestBlock}/${manifestHash}/`;
   callbacks.onComplete(manifestHash, baseUri, manifestJson, totalGasUsed);
 
-  return { manifestHash, fileHashes };
+  return { manifestHash, confirmed: confirmedList };
 }

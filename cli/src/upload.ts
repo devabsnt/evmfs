@@ -2,13 +2,19 @@ import fs from "node:fs";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
 import { ethers } from "ethers";
-import { FileEntry, packBatches, estimateTotalGas } from "./batch.js";
+import {
+  FileEntry,
+  packBatches,
+  expandFilesToUnits,
+  estimateTotalGas,
+} from "./batch.js";
 import {
   buildManifest,
   saveLocalManifest,
   loadUploadState,
   saveUploadState,
   ManifestEntry,
+  ConfirmedChunk,
   UploadState,
 } from "./manifest.js";
 
@@ -27,6 +33,10 @@ interface UploadOptions {
   contract?: string;
   gasLimit: string;
   gateway: string;
+}
+
+function chunkKey(fileIndex: number, chunkIndex: number): string {
+  return `${fileIndex}:${chunkIndex}`;
 }
 
 export async function uploadCommand(options: UploadOptions): Promise<void> {
@@ -72,35 +82,75 @@ export async function uploadCommand(options: UploadOptions): Promise<void> {
     return { index, filename, compressed: new Uint8Array(compressed) };
   });
 
+  const allUnits = expandFilesToUnits(files);
+
+  const chunkedFiles = files.filter((f) => {
+    const units = allUnits.filter((u) => u.fileIndex === f.index);
+    return units.length > 1;
+  });
+  if (chunkedFiles.length > 0) {
+    console.log(
+      `  ${chunkedFiles.length} file(s) exceed ~100KB compressed and will be chunked across multiple transactions.`
+    );
+    for (const f of chunkedFiles) {
+      const units = allUnits.filter((u) => u.fileIndex === f.index);
+      console.log(
+        `    ${f.filename}: ${f.compressed.length.toLocaleString()} bytes → ${units.length} chunks`
+      );
+    }
+  }
+
   let state: UploadState = loadUploadState(folder) ?? {
     folder,
     contractAddress,
     chainId: options.chainId,
-    uploaded: {},
+    chunks: [],
   };
 
-  const alreadyUploaded = new Set(
-    Object.keys(state.uploaded).map((k) => parseInt(k, 10))
+  const confirmedKeys = new Set(
+    state.chunks.map((c) => chunkKey(c.fileIndex, c.chunkIndex))
   );
-  const remaining = files.filter((f) => !alreadyUploaded.has(f.index));
 
-  if (alreadyUploaded.size > 0) {
+  const validConfirmed = state.chunks.filter((c) => {
+    const units = allUnits.filter((u) => u.fileIndex === c.fileIndex);
+    return units.some(
+      (u) => u.chunkIndex === c.chunkIndex && u.totalChunks === c.totalChunks
+    );
+  });
+  if (validConfirmed.length !== state.chunks.length) {
     console.log(
-      `Resuming: ${alreadyUploaded.size} files already uploaded, ${remaining.length} remaining`
+      `  Discarding ${state.chunks.length - validConfirmed.length} stale state entries (chunking changed).`
+    );
+    state.chunks = validConfirmed;
+    confirmedKeys.clear();
+    for (const c of state.chunks)
+      confirmedKeys.add(chunkKey(c.fileIndex, c.chunkIndex));
+  }
+
+  const remainingUnits = allUnits.filter(
+    (u) => !confirmedKeys.has(chunkKey(u.fileIndex, u.chunkIndex))
+  );
+
+  if (confirmedKeys.size > 0) {
+    console.log(
+      `Resuming: ${confirmedKeys.size} chunks already uploaded, ${remainingUnits.length} remaining`
     );
   }
 
-  if (remaining.length === 0 && state.manifestHash) {
+  if (remainingUnits.length === 0 && state.manifestHash) {
     console.log("Upload already complete!");
     printResult(options, state);
     return;
   }
 
-  const batches = packBatches(remaining, gasLimit);
-  const totalGas = batches.reduce((sum, b) => sum + b.estimatedGas, 0);
+  const batches = packBatches(remainingUnits, gasLimit);
+  const totalGas =
+    remainingUnits.length > 0 ? estimateTotalGas(remainingUnits) : 0;
 
   console.log(`\nUpload plan:`);
-  console.log(`  Files to upload: ${remaining.length}`);
+  console.log(
+    `  Chunks to upload: ${remainingUnits.length} (across ${allUnits.length} total)`
+  );
   console.log(`  Transactions needed: ${batches.length}`);
   console.log(`  Estimated total gas: ${totalGas.toLocaleString()}`);
 
@@ -136,15 +186,18 @@ export async function uploadCommand(options: UploadOptions): Promise<void> {
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
     console.log(
-      `\nBatch ${i + 1}/${batches.length}: ${batch.files.length} files (~${batch.estimatedGas.toLocaleString()} gas)`
+      `\nBatch ${i + 1}/${batches.length}: ${batch.units.length} chunks, ${(batch.byteSize / 1024).toFixed(1)} KB (~${batch.estimatedGas.toLocaleString()} gas)`
     );
 
-    const dataArrays = batch.files.map((f) => f.compressed);
+    const dataArrays = batch.units.map((u) => u.data);
+    const hashToUnit = new Map(
+      batch.units.map((u) => [ethers.keccak256(u.data), u])
+    );
 
     try {
       let tx: ethers.ContractTransactionResponse;
 
-      if (batch.files.length === 1) {
+      if (batch.units.length === 1) {
         tx = await contract.store(dataArrays[0]);
       } else {
         tx = await contract.storeBatch(dataArrays);
@@ -168,14 +221,17 @@ export async function uploadCommand(options: UploadOptions): Promise<void> {
         });
         if (parsed && parsed.name === "Store") {
           const contentHash = parsed.args[0] as string;
-          const matchingFile = batch.files.find(
-            (f) =>
-              ethers.keccak256(f.compressed) === contentHash
-          );
-          if (matchingFile) {
-            state.uploaded[matchingFile.index] = contentHash;
+          const unit = hashToUnit.get(contentHash);
+          if (unit) {
+            state.chunks.push({
+              fileIndex: unit.fileIndex,
+              chunkIndex: unit.chunkIndex,
+              totalChunks: unit.totalChunks,
+              hash: contentHash,
+              block: receipt.blockNumber,
+            });
             console.log(
-              `  ${matchingFile.filename} → ${contentHash.slice(0, 18)}...`
+              `  ${unit.name} → ${contentHash.slice(0, 18)}...`
             );
           }
         }
@@ -193,16 +249,34 @@ export async function uploadCommand(options: UploadOptions): Promise<void> {
   if (!state.manifestHash) {
     console.log("\nUploading manifest...");
 
-    const entries: ManifestEntry[] = filenames.map((filename, index) => ({
-      filename,
-      contentHash: state.uploaded[index],
-    }));
+    const chunksByFile = new Map<number, ConfirmedChunk[]>();
+    for (const c of state.chunks) {
+      const list = chunksByFile.get(c.fileIndex) ?? [];
+      list.push(c);
+      chunksByFile.set(c.fileIndex, list);
+    }
 
-    const missing = entries.filter((e) => !e.contentHash);
-    if (missing.length > 0) {
-      console.error(
-        `Error: ${missing.length} files missing hashes. Re-run to retry.`
-      );
+    const entries: ManifestEntry[] = [];
+    let missing = 0;
+    for (let i = 0; i < filenames.length; i++) {
+      const fileChunks = (chunksByFile.get(i) ?? []).slice();
+      fileChunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
+      const expected = allUnits.filter((u) => u.fileIndex === i).length;
+      if (fileChunks.length !== expected) {
+        console.error(
+          `  ${filenames[i]}: missing chunks (${fileChunks.length}/${expected})`
+        );
+        missing++;
+        continue;
+      }
+      entries.push({
+        filename: filenames[i],
+        chunks: fileChunks.map((c) => ({ hash: c.hash, block: c.block })),
+      });
+    }
+
+    if (missing > 0) {
+      console.error(`Error: ${missing} files missing chunks. Re-run to retry.`);
       process.exit(1);
     }
 
@@ -228,10 +302,7 @@ export async function uploadCommand(options: UploadOptions): Promise<void> {
 
     saveUploadState(folder, state);
 
-    saveLocalManifest(
-      entries,
-      folder
-    );
+    saveLocalManifest(entries, folder);
 
     console.log(`  Manifest confirmed in block ${receipt.blockNumber}`);
   }
@@ -240,14 +311,19 @@ export async function uploadCommand(options: UploadOptions): Promise<void> {
 }
 
 function printResult(options: UploadOptions, state: UploadState): void {
-  const uploadedCount = Object.keys(state.uploaded).length;
+  const fileCount = new Set(state.chunks.map((c) => c.fileIndex)).size;
   console.log(`\n✓ Upload complete!`);
-  console.log(`  Files: ${uploadedCount}`);
+  console.log(`  Files: ${fileCount}`);
+  console.log(`  Chunks stored: ${state.chunks.length}`);
   console.log(`  Manifest hash: ${state.manifestHash}`);
   console.log(
     `  Base URI: ${options.gateway}/${options.chainId}/${state.manifestHash}/`
   );
-  console.log(`\n  Token 0: ${options.gateway}/${options.chainId}/${state.manifestHash}/0`);
-  console.log(`  Token 1: ${options.gateway}/${options.chainId}/${state.manifestHash}/1`);
+  console.log(
+    `\n  Token 0: ${options.gateway}/${options.chainId}/${state.manifestHash}/0`
+  );
+  console.log(
+    `  Token 1: ${options.gateway}/${options.chainId}/${state.manifestHash}/1`
+  );
   console.log(`  ...`);
 }

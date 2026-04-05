@@ -11,7 +11,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 )
+
+const multipartFetchConcurrency = 8
 
 var contentHashRegex = regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
 
@@ -110,14 +113,22 @@ func (s *Server) handleFile(w http.ResponseWriter, chainId, contentHash string, 
 }
 
 type manifestEntry struct {
-	H string `json:"h"`
-	B int64  `json:"b"`
+	H string          `json:"h,omitempty"`
+	B int64           `json:"b,omitempty"`
+	P []manifestEntry `json:"p,omitempty"`
+}
+
+func (e manifestEntry) isMultipart() bool {
+	return len(e.P) > 0
 }
 
 func parseManifest(data []byte) ([]manifestEntry, error) {
 	var entries []manifestEntry
-	if err := json.Unmarshal(data, &entries); err == nil && len(entries) > 0 && entries[0].H != "" {
-		return entries, nil
+	if err := json.Unmarshal(data, &entries); err == nil && len(entries) > 0 {
+		first := entries[0]
+		if first.H != "" || first.isMultipart() {
+			return entries, nil
+		}
 	}
 
 	var hashes []string
@@ -163,16 +174,31 @@ func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request, chainId,
 	}
 
 	entry := entries[tokenId]
-	if !contentHashRegex.MatchString(entry.H) {
-		http.Error(w, "invalid content hash in manifest", http.StatusInternalServerError)
-		return
-	}
-
-	data, err := s.fetchAndDecompress(chainId, entry.H, entry.B)
-	if err != nil {
-		log.Printf("error fetching content %s/%s from manifest: %v", chainId, entry.H, err)
-		http.Error(w, fmt.Sprintf("failed to fetch content: %v", err), http.StatusBadGateway)
-		return
+	var data []byte
+	if entry.isMultipart() {
+		for i, part := range entry.P {
+			if !contentHashRegex.MatchString(part.H) {
+				http.Error(w, fmt.Sprintf("invalid content hash in manifest part %d", i), http.StatusInternalServerError)
+				return
+			}
+		}
+		data, err = s.fetchMultipart(chainId, entry.P)
+		if err != nil {
+			log.Printf("error fetching multipart content for token %d of %s/%s: %v", tokenId, chainId, manifestHash, err)
+			http.Error(w, fmt.Sprintf("failed to fetch content: %v", err), http.StatusBadGateway)
+			return
+		}
+	} else {
+		if !contentHashRegex.MatchString(entry.H) {
+			http.Error(w, "invalid content hash in manifest", http.StatusInternalServerError)
+			return
+		}
+		data, err = s.fetchAndDecompress(chainId, entry.H, entry.B)
+		if err != nil {
+			log.Printf("error fetching content %s/%s from manifest: %v", chainId, entry.H, err)
+			http.Error(w, fmt.Sprintf("failed to fetch content: %v", err), http.StatusBadGateway)
+			return
+		}
 	}
 
 	contentType := DetectContentType(data)
@@ -200,14 +226,27 @@ func (s *Server) handleDirectory(w http.ResponseWriter, r *http.Request, chainId
 	}
 
 	if r.URL.Query().Get("format") == "json" {
-		type jsonEntry struct {
-			Index int    `json:"index"`
+		type jsonPart struct {
 			Hash  string `json:"hash"`
 			Block int64  `json:"block,omitempty"`
 		}
+		type jsonEntry struct {
+			Index int        `json:"index"`
+			Hash  string     `json:"hash,omitempty"`
+			Block int64      `json:"block,omitempty"`
+			Parts []jsonPart `json:"parts,omitempty"`
+		}
 		out := make([]jsonEntry, len(entries))
 		for i, e := range entries {
-			out[i] = jsonEntry{Index: i, Hash: e.H, Block: e.B}
+			if e.isMultipart() {
+				parts := make([]jsonPart, len(e.P))
+				for j, p := range e.P {
+					parts[j] = jsonPart{Hash: p.H, Block: p.B}
+				}
+				out[i] = jsonEntry{Index: i, Parts: parts}
+			} else {
+				out[i] = jsonEntry{Index: i, Hash: e.H, Block: e.B}
+			}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -245,13 +284,20 @@ tr:hover{background:#13131f}
 	sb.WriteString(`<table><tr><th>#</th><th>Hash</th></tr>`)
 
 	for i, e := range entries {
-		eShort := e.H
-		if len(eShort) > 14 {
-			eShort = eShort[:10] + "..." + eShort[len(eShort)-4:]
+		var displayHash string
+		var label string
+		if e.isMultipart() && len(e.P) > 0 {
+			displayHash = e.P[0].H
+			label = fmt.Sprintf(" &middot; %d parts", len(e.P))
+		} else {
+			displayHash = e.H
+		}
+		if len(displayHash) > 14 {
+			displayHash = displayHash[:10] + "..." + displayHash[len(displayHash)-4:]
 		}
 		sb.WriteString(fmt.Sprintf(
-			`<tr><td><a href="%s%d">%d</a></td><td class="hash">%s</td></tr>`,
-			basePath, i, i, eShort,
+			`<tr><td><a href="%s%d">%d</a></td><td class="hash">%s%s</td></tr>`,
+			basePath, i, i, displayHash, label,
 		))
 	}
 
@@ -261,6 +307,71 @@ tr:hover{background:#13131f}
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(sb.String()))
+}
+
+func (s *Server) fetchRawChunk(chainId, contentHash string, blockHint int64) ([]byte, error) {
+	cached, err := s.Cache.GetRaw(chainId, contentHash)
+	if err != nil {
+		log.Printf("raw cache read error for %s/%s: %v", chainId, contentHash, err)
+	}
+	if cached != nil {
+		return cached, nil
+	}
+
+	rpcURLs, ok := s.Config.RPCURLs[chainId]
+	if !ok || len(rpcURLs) == 0 {
+		return nil, fmt.Errorf("no RPC URLs configured for chain %s", chainId)
+	}
+
+	raw, err := FetchContent(rpcURLs, s.Config.ContractAddress, contentHash, blockHint)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.Cache.SetRaw(chainId, contentHash, raw); err != nil {
+		log.Printf("raw cache write error for %s/%s: %v", chainId, contentHash, err)
+	}
+
+	return raw, nil
+}
+
+func (s *Server) fetchMultipart(chainId string, parts []manifestEntry) ([]byte, error) {
+	chunks := make([][]byte, len(parts))
+	errs := make([]error, len(parts))
+
+	sem := make(chan struct{}, multipartFetchConcurrency)
+	var wg sync.WaitGroup
+
+	for i := range parts {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(idx int) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			data, err := s.fetchRawChunk(chainId, parts[idx].H, parts[idx].B)
+			chunks[idx] = data
+			errs[idx] = err
+		}(i)
+	}
+	wg.Wait()
+
+	totalLen := 0
+	for i, err := range errs {
+		if err != nil {
+			return nil, fmt.Errorf("part %d (%s): %w", i, parts[i].H, err)
+		}
+		totalLen += len(chunks[i])
+	}
+
+	combined := make([]byte, 0, totalLen)
+	for _, c := range chunks {
+		combined = append(combined, c...)
+	}
+
+	if decompressed, err := gunzip(combined); err == nil {
+		return decompressed, nil
+	}
+	return combined, nil
 }
 
 func (s *Server) fetchAndDecompress(chainId, contentHash string, blockHint int64) ([]byte, error) {

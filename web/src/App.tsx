@@ -10,7 +10,7 @@ import { UploadHistory } from "./components/UploadHistory";
 import { Docs } from "./components/Docs";
 import { useFileProcessor } from "./hooks/useFileProcessor";
 import { useUploadHistory } from "./hooks/useUploadHistory";
-import { uploadFiles, uploadFilesWithPrivateKey, type UploadCallbacks, loadProgress, clearProgress, progressMatchesFiles, type SavedProgress } from "./lib/evmfs";
+import { uploadFiles, uploadFilesWithPrivateKey, type UploadCallbacks, loadProgress, clearProgress, progressMatchesFiles, type SavedProgress, type ManifestOutputEntry, getDisplayHash } from "./lib/evmfs";
 import { calculateFee, FEE_RECIPIENT } from "./lib/fee";
 import { EVMFS_CONTRACT, DEFAULT_RPC_URLS } from "./lib/wagmi";
 import type { SavedUpload } from "./lib/history";
@@ -113,7 +113,7 @@ export default function App() {
         }));
 
         if (result) {
-          const manifestEntries: { h: string; b: number }[] = JSON.parse(manifestJson);
+          const manifestEntries: ManifestOutputEntry[] = JSON.parse(manifestJson);
           const savedUpload: SavedUpload = {
             id: crypto.randomUUID(),
             timestamp: Date.now(),
@@ -125,7 +125,7 @@ export default function App() {
             files: result.files.map((f, i) => ({
               index: f.index,
               filename: f.name,
-              contentHash: manifestEntries[i]?.h ?? "",
+              contentHash: manifestEntries[i] ? getDisplayHash(manifestEntries[i]) : "",
             })),
             label: `Upload ${new Date().toLocaleDateString()}`,
           };
@@ -157,7 +157,7 @@ export default function App() {
       currentTxHash: null,
       status: isResume ? "Resuming upload..." : "Sending protocol fee...",
       completedFiles: isResume ? resumeProgress!.confirmed.length : 0,
-      totalFiles: result.files.length,
+      totalFiles: result.totalUnits,
     });
 
     const callbacks = createCallbacks();
@@ -517,7 +517,8 @@ export default function App() {
             {(() => {
               const saved = loadProgress();
               if (!saved || !progressMatchesFiles(saved, result.files, chainId, EVMFS_CONTRACT)) return null;
-              const pct = Math.round((saved.confirmed.length / result.files.length) * 100);
+              const pct = Math.round((saved.confirmed.length / result.totalUnits) * 100);
+              const partLabel = result.totalUnits === result.files.length ? "files" : "parts";
               return (
                 <div style={{
                   padding: "14px 16px",
@@ -531,7 +532,7 @@ export default function App() {
                 }}>
                   <div>
                     <div style={{ color: "#d1d5db", fontSize: 14, fontWeight: 500 }}>
-                      Previous upload found ({saved.confirmed.length}/{result.files.length} files, {pct}%)
+                      Previous upload found ({saved.confirmed.length}/{result.totalUnits} {partLabel}, {pct}%)
                     </div>
                     <div style={{ color: "#6b7280", fontSize: 12, marginTop: 2 }}>
                       Resume to skip already-confirmed batches
@@ -595,7 +596,9 @@ export default function App() {
                 ? "Connect wallet to upload"
                 : uploadMode === "privatekey" && !pkConfig
                   ? "Configure private key"
-                  : `Upload ${result.files.length} files`}
+                  : result.chunkedFileCount > 0
+                    ? `Upload ${result.files.length} files (${result.totalUnits} parts)`
+                    : `Upload ${result.files.length} files`}
             </button>
           </>
         )}

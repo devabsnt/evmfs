@@ -185,6 +185,21 @@ function DevsDocs() {
         </p>
       </Section>
 
+      <Section title="Large files (multi-part entries)">
+        Files over ~100 KB are split into ordered chunks across multiple <Code>store()</Code> calls. The manifest entry uses a <Code>p</Code> (parts) field listing each chunk in order:
+        <CodeBlock>{`[
+  {"h": "0xabc...", "b": 19280143},
+  {"p": [
+    {"h": "0xaaa...", "b": 19280150},
+    {"h": "0xbbb...", "b": 19280151},
+    {"h": "0xccc...", "b": 19280152}
+  ]}
+]`}</CodeBlock>
+        <p style={{ margin: "10px 0 0" }}>
+          The gateway fetches all parts, concatenates them in array order, and gunzips the combined blob. No contract change — chunks are ordinary <Code>Store</Code> events. Single-chunk entries remain unchanged, so existing manifests stay valid.
+        </p>
+      </Section>
+
       <Section title="Contract ABI">
         <CodeBlock>{`function store(bytes calldata data) external returns (bytes32);
 function storeBatch(bytes[] calldata data) external returns (bytes32[]);
