@@ -120,7 +120,7 @@ function UsersDocs() {
           <li>Read events via Etherscan's free API</li>
         </ul>
         <p style={{ margin: "12px 0 0" }}>
-          All you need to save: the contract address, chain ID, your manifest hash, and manifest block number. Those 36 bytes unlock the whole collection.
+          All you need to save: the contract address, chain ID, your manifest hash, and manifest block number. Those 36 bytes unlock everything you uploaded.
         </p>
       </Section>
 
@@ -138,7 +138,7 @@ function UsersDocs() {
           <li><Code>1</Code> — chain ID (Ethereum mainnet)</li>
           <li><Code>19280143</Code> — block where the manifest was stored</li>
           <li><Code>0xabc...</Code> — your manifest hash</li>
-          <li><Code>0</Code> — file index within your collection</li>
+          <li><Code>0</Code> — file index within your manifest</li>
         </ul>
       </Section>
 
