@@ -1,0 +1,22 @@
+{
+  "name": "evmfs-cli",
+  "version": "1.0.0",
+  "description": "CLI tool for uploading files to EVMFS",
+  "type": "module",
+  "bin": {
+    "evmfs": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "commander": "^12.0.0",
+    "ethers": "^6.11.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0",
+    "@types/node": "^20.11.0"
+  }
+}
