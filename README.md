@@ -24,15 +24,15 @@ Nothing novel in the underlying mechanic. What's novel is that the upload toolin
 
 Rough ballpark for a **10,000-file PFP collection** (~400 bytes/file gzipped, batched efficiently):
 
-| Gas price | Cost (ETH) | Cost @ $3,500/ETH |
+| Gas price | Cost (ETH) | Cost @ $2,500/ETH |
 |-----------|-----------|-------------------|
-| 10 gwei   | ~1.1 ETH  | ~$3,850          |
-| 30 gwei   | ~3.3 ETH  | ~$11,550         |
-| 50 gwei   | ~5.5 ETH  | ~$19,250         |
+| 0.1 gwei  | ~0.011 ETH | ~$27.50          |
+| 1 gwei    | ~0.11 ETH  | ~$275            |
+| 10 gwei   | ~1.1 ETH   | ~$2,750          |
 
-At the small end, a **single 2 KB metadata JSON** costs ~76,000 gas — roughly **$0.53 at 10 gwei / $3,500 ETH**, or ~$2.65 at 50 gwei. That's the realistic floor for entry-level use.
+At the small end, a **single 2 KB metadata JSON** costs ~76,000 gas — roughly **$0.02 at 0.1 gwei / $2,500 ETH**, or ~$1.90 at 10 gwei. That's the realistic floor for entry-level use.
 
-A **1,000-file collection** is roughly 1/10th of the 10k numbers. A **single 10 KB image** costs ~260,000 gas — about $27 at 30 gwei / $3,500 ETH.
+A **1,000-file collection** is roughly 1/10th of the 10k numbers. A **single 10 KB image** costs ~260,000 gas — about **$0.65 at 1 gwei / $2,500 ETH**, or ~$6.50 at 10 gwei.
 
 This is a **one-time cost**. Nothing ever expires. There is no pinning service, no endowment, no ongoing fee.
 
