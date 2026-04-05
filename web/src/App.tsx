@@ -7,6 +7,7 @@ import { CostEstimate } from "./components/CostEstimate";
 import { UploadProgress } from "./components/UploadProgress";
 import { PrivateKeyInput } from "./components/PrivateKeyInput";
 import { UploadHistory } from "./components/UploadHistory";
+import { Docs } from "./components/Docs";
 import { useFileProcessor } from "./hooks/useFileProcessor";
 import { useUploadHistory } from "./hooks/useUploadHistory";
 import { uploadFiles, uploadFilesWithPrivateKey, type UploadCallbacks, loadProgress, clearProgress, progressMatchesFiles, type SavedProgress } from "./lib/evmfs";
@@ -15,7 +16,7 @@ import { EVMFS_CONTRACT, DEFAULT_RPC_URLS } from "./lib/wagmi";
 import type { SavedUpload } from "./lib/history";
 
 type UploadMode = "wallet" | "privatekey";
-type Tab = "upload" | "history";
+type Tab = "upload" | "history" | "docs";
 
 interface UploadUIState {
   phase: "idle" | "uploading" | "manifest" | "complete" | "error";
@@ -376,6 +377,23 @@ export default function App() {
           >
             History{history.uploads.length > 0 ? ` (${history.uploads.length})` : ""}
           </button>
+          <button
+            onClick={() => setTab("docs")}
+            style={{
+              flex: 1,
+              padding: "10px 16px",
+              background: tab === "docs" ? "#1e1e2e" : "transparent",
+              color: tab === "docs" ? "#e0e0e0" : "#6b7280",
+              border: "none",
+              borderLeft: "1px solid #1e1e2e",
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+            }}
+          >
+            Docs
+          </button>
         </div>
 
         {tab === "history" && (
@@ -387,7 +405,36 @@ export default function App() {
           />
         )}
 
+        {tab === "docs" && <Docs />}
+
         {tab === "upload" && <>
+        <div style={{
+          padding: "10px 14px",
+          background: "rgba(91, 125, 239, 0.06)",
+          borderRadius: 8,
+          border: "1px solid rgba(91, 125, 239, 0.15)",
+          marginBottom: 20,
+          fontSize: 13,
+          color: "#9ca3af",
+          lineHeight: 1.5,
+        }}>
+          Your files are stored on Ethereum, not on this site.{" "}
+          <button
+            onClick={() => setTab("docs")}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#5b7def",
+              cursor: "pointer",
+              padding: 0,
+              font: "inherit",
+              textDecoration: "underline",
+            }}
+          >
+            How does that work?
+          </button>
+        </div>
+
         <div style={{ marginBottom: 24 }}>
           <label style={{ display: "block", color: "#9ca3af", fontSize: 13, marginBottom: 8 }}>
             Signing method

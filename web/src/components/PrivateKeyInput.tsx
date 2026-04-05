@@ -23,7 +23,9 @@ export function PrivateKeyInput({ onSubmit, disabled }: PrivateKeyInputProps) {
         lineHeight: 1.5,
         color: "#d1d5db",
       }}>
-        <strong style={{ color: "#eab308" }}>Security note:</strong> For safety, create a new wallet
+        <strong style={{ color: "#eab308" }}>Security note:</strong> Your private key stays in your
+        browser and is never sent to any server. It's only used locally to sign transactions, and is
+        discarded when you close or refresh this page. Even so — for safety, create a new wallet
         specifically for uploading. Transfer only the ETH needed for the upload, then discard the key.
         Never use a wallet that holds significant funds.
       </div>

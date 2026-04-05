@@ -6,6 +6,8 @@ Event logs have always been a permanent storage primitive baked into Ethereum's 
 
 Nobody wrapped a proper product around this. EVMFS is that product.
 
+It was designed primarily to make NFT metadata cheap to store fully on-chain — images, JSON, attributes, the full set — at a fraction of the cost of alternatives, with none of the dependency risk. But nothing about the protocol is NFT-specific. Anything you can represent as bytes works: documents, provenance records, certificates, snapshots, data archives.
+
 ---
 
 ## What this actually is
@@ -22,7 +24,7 @@ Nothing novel in the underlying mechanic. What's novel is that the upload toolin
 
 ## What it costs
 
-Rough ballpark for a **10,000-file PFP collection** (~400 bytes/file gzipped, batched efficiently):
+Rough ballpark for **10,000 small files** (~400 bytes/file gzipped, batched efficiently):
 
 | Gas price | Cost (ETH) | Cost @ $2,500/ETH |
 |-----------|-----------|-------------------|
@@ -32,7 +34,7 @@ Rough ballpark for a **10,000-file PFP collection** (~400 bytes/file gzipped, ba
 
 At the small end, a **single 2 KB metadata JSON** costs ~76,000 gas — roughly **$0.02 at 0.1 gwei / $2,500 ETH**, or ~$1.90 at 10 gwei. That's the realistic floor for entry-level use.
 
-A **1,000-file collection** is roughly 1/10th of the 10k numbers. A **single 10 KB image** costs ~260,000 gas — about **$0.65 at 1 gwei / $2,500 ETH**, or ~$6.50 at 10 gwei.
+A **1,000-file batch** is roughly 1/10th of the 10k numbers. A **single 10 KB image** costs ~260,000 gas — about **$0.65 at 1 gwei / $2,500 ETH**, or ~$6.50 at 10 gwei.
 
 This is a **one-time cost**. Nothing ever expires. There is no pinning service, no endowment, no ongoing fee.
 
@@ -46,7 +48,7 @@ This is the same pattern Uniswap uses: free contract, hosted frontend earns its 
 
 ### Where EVMFS makes sense
 
-- NFT collections (metadata + images, typically small files)
+- NFT metadata and images (the primary design target)
 - Provenance records, certificates, small documents
 - Anything you want genuinely immutable and chain-verifiable
 - Data that should remain retrievable for as long as Ethereum exists
@@ -143,7 +145,7 @@ Etherscan's API exposes `eth_getLogs`. Every archive node serves the same data. 
 - `manifestHash`: 32-byte hash
 - `manifestBlock`: block number
 
-Those values unlock the whole collection forever.
+Those values unlock everything you uploaded, forever.
 
 ### What would have to fail for files to be lost
 
@@ -162,15 +164,6 @@ Both deployed via CREATE2. Addresses differ because the two deploys used differe
 
 ---
 
-## Practical recommendations for collection owners
-
-1. Save `(contractAddress, chainId, manifestHash, manifestBlock)` in your project README.
-2. Optionally pin the manifest JSON on IPFS or Arweave as belt-and-suspenders.
-3. Document the gateway URL pattern in your NFT contract comments so future developers can rebuild access.
-4. Wait for manifest tx finality (~2 epochs / ~13 minutes) before publishing base URIs — this closes the narrow window where a reorg could invalidate recorded block numbers.
-
----
-
 ## Repo layout
 
 ```
@@ -180,5 +173,3 @@ gateway/        Go HTTP gateway (stateless, cacheable)
 web/            React web UI (wagmi + RainbowKit)
 scripts/        Deployment scripts (mainnet + sepolia)
 ```
-
-For implementation details — batching math, retry logic, gas formulas, manifest format, contract internals — see [ARCHITECTURE.md](./ARCHITECTURE.md).
