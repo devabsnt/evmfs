@@ -2,23 +2,23 @@
 
 **Ethereum-native permanent storage.**
 
-Event logs have always been a permanent storage primitive baked into Ethereum's consensus layer. Every log is part of the receipt trie, replicated across every archive node, validated by every full node, and required for chain verification. They are as durable as the chain itself — and vastly cheaper than contract storage.
+Event logs have always been a permanent storage primitive baked into Ethereum's consensus layer. Every log is part of the receipt trie, replicated across every archive node, validated by every full node, and required for chain verification. They are as durable as the chain itself - and vastly cheaper than contract storage.
 
 Nobody wrapped a proper product around this. EVMFS is that product.
 
-It was designed primarily to make NFT metadata cheap to store fully on-chain — images, JSON, attributes, the full set — at a fraction of the cost of alternatives, with none of the dependency risk. But nothing about the protocol is NFT-specific. Anything you can represent as bytes works: documents, provenance records, certificates, snapshots, data archives.
+It was designed primarily to make NFT metadata cheap to store fully on-chain; images, JSON, attributes, everything - at a fraction of the cost of alternatives, with none of the dependency risk. But nothing about the protocol is NFT-specific. Anything you can represent as bytes works: documents, provenance records, certificates, snapshots, data archives.
 
 ---
 
-## What this actually is
+## What EVMFS actually is
 
-A 31-line Solidity contract that emits events containing your (gzipped) file bytes. LOG opcodes cost ~8 gas per byte — roughly **2,500× cheaper than SSTORE** for bulk data. Files are content-addressed via keccak256 hash. A manifest transaction binds N files into a single hash, producing a URI that drops straight into an ERC-721 `baseURI()`:
+A 31-line Solidity contract that emits events containing your (gzipped) file bytes. LOG opcodes cost ~8 gas per byte: roughly **2,500× cheaper than SSTORE** for bulk data. Files are content-addressed via keccak256 hash. A manifest transaction binds N files into a single hash, producing a URI that drops straight into an ERC-721 `baseURI()`:
 
 ```
 https://evmfs.xyz/{chainId}/{manifestBlock}/{manifestHash}/
 ```
 
-Nothing novel in the underlying mechanic. What's novel is that the upload tooling, gateway, web UI, resume logic, batching math, and manifest format already exist and work — so you can actually use this primitive without writing 2,000 lines of glue code yourself.
+Nothing novel in the underlying mechanic. What's different is that the upload tooling, gateway, web UI and manifest format already exist and work - so you can actually use this primitive without writing 2,000 lines of glue code yourself.
 
 ---
 
@@ -27,10 +27,10 @@ Nothing novel in the underlying mechanic. What's novel is that the upload toolin
 Rough ballpark for **10,000 small files** (~400 bytes/file gzipped, batched efficiently):
 
 | Gas price | Cost (ETH) | Cost @ $2,500/ETH |
-|-----------|-----------|-------------------|
-| 0.1 gwei  | ~0.011 ETH | ~$27.50          |
-| 1 gwei    | ~0.11 ETH  | ~$275            |
-| 10 gwei   | ~1.1 ETH   | ~$2,750          |
+|-----------|-----------|--------------------|
+| 0.1 gwei  | ~0.011 ETH | ~$27.50           |
+| 1 gwei    | ~0.11 ETH  | ~$275             |
+| 10 gwei   | ~1.1 ETH   | ~$2,750           |
 
 At the small end, a **single 2 KB metadata JSON** costs ~76,000 gas — roughly **$0.02 at 0.1 gwei / $2,500 ETH**, or ~$1.90 at 10 gwei. That's the realistic floor for entry-level use.
 
