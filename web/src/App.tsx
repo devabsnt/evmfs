@@ -533,7 +533,7 @@ export default function App() {
                 transition: "all 0.2s ease",
               }}
             >
-              Deploy site
+              Deploy folder
             </button>
           </div>
         </div>
@@ -553,6 +553,19 @@ export default function App() {
                 <span style={{ color: "#22c55e", fontSize: 13 }}>Key configured. Transactions will be signed automatically.</span>
               </div>
             )}
+            <div style={{
+              marginTop: 10,
+              padding: "8px 12px",
+              background: "rgba(91, 125, 239, 0.06)",
+              borderRadius: 6,
+              border: "1px solid rgba(91, 125, 239, 0.12)",
+              fontSize: 12,
+              color: "#6b7280",
+              lineHeight: 1.5,
+            }}>
+              Prefer not to enter a key in the browser? Use the CLI instead:{" "}
+              <code style={{ color: "#9ca3af", fontSize: 11 }}>npm install -g evmfs-cli</code>
+            </div>
           </div>
         )}
 

@@ -1,6 +1,6 @@
 {
   "name": "evmfs-cli",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "CLI tool for uploading and deploying files to EVMFS - permanent decentralized storage on Ethereum",
   "type": "module",
   "bin": {

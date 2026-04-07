@@ -122,11 +122,11 @@ https://evmfs.xyz/{chainId}/{block}/{manifestHash}/assets/style.css
 ### JavaScript library
 
 ```bash
-npm install evmfs
+npm install evmfs-lib
 ```
 
 ```javascript
-import { EVMFS } from "evmfs";
+import { EVMFS } from "evmfs-lib";
 
 const fs = new EVMFS({
   rpc: "https://eth.llamarpc.com",
@@ -141,6 +141,24 @@ const files = await fs.fetchAll(manifestHash, blockNum, { concurrency: 5 });
 ```
 
 Zero required dependencies. Works in Node 18+ and modern browsers. Optional `@noble/hashes` peer dep for keccak256 hash verification.
+
+### EVMFS Names
+
+Register a permanent subdomain for your deployed site at [names.evmfs.xyz](https://names.evmfs.xyz).
+
+```bash
+# Register a name (0.001 ETH, one-time, no renewals)
+evmfs register --name mysite --manifest 0xabc... --block 24826863 \
+  --names-contract 0x36043906ba7c191c9511a60a8b28e3a602ed1477
+
+# Update to point to a new deployment
+evmfs update-name --name mysite --manifest 0xdef... --block 24827000 \
+  --names-contract 0x36043906ba7c191c9511a60a8b28e3a602ed1477
+```
+
+Names are ERC-721 NFTs — transferable and tradeable on any marketplace. The gateway resolves names on-chain with zero configuration. Only the wallet that uploaded a manifest can register a name for it.
+
+- **EVMFSNames contract** (mainnet): `0x36043906ba7c191c9511a60a8b28e3a602ed1477`
 
 ### Security note on auto-signing
 
@@ -217,21 +235,24 @@ Those values unlock everything you uploaded, forever.
 
 ## Deployment
 
-- **Ethereum mainnet** (chain ID `1`): `0x140cbDFf649929D003091a5B8B3be34588753aBA` — production
-- **Sepolia** (chain ID `11155111`): `0x443E0EFed7Ca889e31f65b3a262999C88a1D470F` — testing
+### EVMFS (storage)
+- **Ethereum mainnet** (chain ID `1`): `0x140cbDFf649929D003091a5B8B3be34588753aBA`
+- **Sepolia** (chain ID `11155111`): `0x443E0EFed7Ca889e31f65b3a262999C88a1D470F`
 
-Both deployed via CREATE2. Addresses differ because the two deploys used different Solidity compiler versions (0.8.34 on mainnet, 0.8.24 on Sepolia) — the contract logic is identical.
+### EVMFSNames (subdomain registry)
+- **Ethereum mainnet** (chain ID `1`): `0x36043906ba7c191c9511a60a8b28e3a602ed1477`
 
 ---
 
 ## Repo layout
 
 ```
-contracts/      Solidity contract + Foundry tests
+contracts/      Solidity contracts (EVMFS + EVMFSNames)
 cli/            TypeScript CLI (npm: evmfs-cli)
-lib/            Standalone JS library (npm: evmfs)
+lib/            Standalone JS library (npm: evmfs-lib)
 gateway/        Go HTTP gateway (stateless, cacheable)
 web/            React web UI (wagmi + RainbowKit)
+names-ui/       EVMFS Names registration UI (names.evmfs.xyz)
 demo-site/      Example static site for deploying to EVMFS
 scripts/        Deployment scripts (mainnet + sepolia)
 ```

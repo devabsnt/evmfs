@@ -149,6 +149,28 @@ function UsersDocs() {
       <Section title="How do I access files without this site?">
         You need four values: contract address, chain ID, manifest hash, and manifest block number. Save them in your project README or NFT contract comments. With those, any developer can reconstruct access in ~50 lines of JavaScript against any Ethereum RPC. Full instructions are in the <strong style={{ color: "#d1d5db" }}>For Developers</strong> tab.
       </Section>
+
+      <Section title="Static site hosting">
+        EVMFS can host entire websites on Ethereum. Switch to <strong style={{ color: "#d1d5db" }}>Deploy folder</strong> mode, drop your site's build folder, and upload. The gateway serves files by their original path with correct content types:
+        <CodeBlock>{`https://evmfs.xyz/1/24826863/0xabc.../index.html
+https://evmfs.xyz/1/24826863/0xabc.../assets/style.css`}</CodeBlock>
+        <p style={{ margin: "12px 0 0" }}>
+          SPA fallback is built in — requests for paths without a file extension serve <Code>index.html</Code> automatically.
+        </p>
+      </Section>
+
+      <Section title="EVMFS Names">
+        Don't want long URLs? Register a permanent subdomain at <a href="https://names.evmfs.xyz" target="_blank" rel="noopener noreferrer" style={{ color: "#5b7def", textDecoration: "none" }}>names.evmfs.xyz</a>. Pick a name, point it at your manifest, and your site is live at <Code>yourname.evmfs.xyz</Code>.
+        <ul style={{ margin: "10px 0 0", paddingLeft: 20 }}>
+          <li>0.001 ETH one-time registration, no renewals</li>
+          <li>Names are ERC-721 NFTs — transferable and tradeable</li>
+          <li>Update your manifest anytime to deploy a new version</li>
+          <li>The gateway resolves names on-chain, no databases</li>
+        </ul>
+        <p style={{ margin: "12px 0 0" }}>
+          Or use the CLI: <Code>npm install -g evmfs-cli</Code> then <Code>evmfs register --name mysite --manifest 0x... --block 12345</Code>
+        </p>
+      </Section>
     </div>
   );
 }
@@ -170,8 +192,11 @@ function DevsDocs() {
           <li><Code>chainId</Code> — EVM chain ID the contract is deployed on</li>
           <li><Code>manifestBlock</Code> — block number of the manifest tx (enables fast RPC lookups)</li>
           <li><Code>manifestHash</Code> — keccak256 of the gzipped manifest bytes</li>
-          <li><Code>fileIndex</Code> — 0-indexed position in the manifest array</li>
+          <li><Code>fileIndex</Code> — 0-indexed position in the manifest array, or a file path for deployed sites</li>
         </ul>
+        <p style={{ margin: "12px 0 0" }}>
+          Want a shorter URL? Register a subdomain at <a href="https://names.evmfs.xyz" target="_blank" rel="noopener noreferrer" style={{ color: "#5b7def", textDecoration: "none" }}>names.evmfs.xyz</a> and access your content at <Code>yourname.evmfs.xyz</Code>.
+        </p>
       </Section>
 
       <Section title="Manifest format">
@@ -244,6 +269,81 @@ docker run -p 8080:8080 \\
   -e CONTRACT_ADDRESS=0x140cbDFf649929D003091a5B8B3be34588753aBA \\
   -e RPC_URLS="1=https://eth.llamarpc.com" \\
   evmfs-gateway`}</CodeBlock>
+      </Section>
+
+      <Section title="EVMFS Names contract">
+        On-chain subdomain registry. Register <Code>yourname.evmfs.xyz</Code> for 0.001 ETH — no renewals, names are ERC-721 NFTs.
+        <CodeBlock>{`// EVMFSNames — Ethereum mainnet
+0x36043906ba7c191c9511a60a8b28e3a602ed1477
+
+// ABI (key functions)
+function register(string name, uint64 block, bytes32 manifest) payable
+function update(string name, uint64 block, bytes32 manifest)
+function lookup(string name) view returns (address, uint64, bytes32)
+
+// Only the manifest uploader can register a name for it.
+// Name owner can update the manifest at any time.
+// Standard ERC-721 — transferFrom, safeTransferFrom, etc.`}</CodeBlock>
+      </Section>
+
+      <Section title="npm packages">
+        <p style={{ margin: "0 0 10px" }}>
+          <strong style={{ color: "#d1d5db" }}>evmfs-cli</strong> — command-line tool for uploads, deploys, and name registration.
+        </p>
+        <CodeBlock>{`npm install -g evmfs-cli
+
+evmfs deploy --folder ./dist      # deploy a static site
+evmfs upload --folder ./metadata   # upload files (NFT metadata)
+evmfs register --name mysite \\
+  --manifest 0x... --block 12345   # register a subdomain
+evmfs update-name --name mysite \\
+  --manifest 0x... --block 12346   # update to new deployment
+evmfs verify --hash 0x...          # verify on-chain content`}</CodeBlock>
+        <p style={{ margin: "12px 0 10px" }}>
+          <strong style={{ color: "#d1d5db" }}>evmfs</strong> — standalone JS library for fetching EVMFS content. Zero required dependencies.
+        </p>
+        <CodeBlock>{`npm install evmfs-lib
+
+import { EVMFS } from "evmfs-lib";
+const fs = new EVMFS({ rpc: "...", contract: "0x140c..." });
+
+// Fetch a file by path or index
+const data = await fs.fetch(hash, block, "index.html");
+
+// Fetch all files with concurrency control
+const files = await fs.fetchAll(hash, block, { concurrency: 5 });
+
+// Parse a manifest
+const entries = await fs.manifest(hash, block);`}</CodeBlock>
+      </Section>
+
+      <Section title="Run your own gateway">
+        <p style={{ margin: "0 0 10px" }}>
+          The gateway at evmfs.xyz is a convenience — not a dependency. Anyone can run their own. The gateway is a stateless Go binary that reads from any Ethereum RPC and caches to disk.
+        </p>
+        <CodeBlock>{`# Clone and build
+git clone https://github.com/devabsnt/evmfs
+cd evmfs/gateway
+go build -o evmfs-gateway .
+
+# Run
+CONTRACT_ADDRESS=0x140cbDFf649929D003091a5B8B3be34588753aBA \\
+RPC_URLS="1=https://eth.llamarpc.com" \\
+./evmfs-gateway
+
+# Or with Docker
+docker build -t evmfs-gateway .
+docker run -p 8080:8080 \\
+  -e CONTRACT_ADDRESS=0x140cbDFf649929D003091a5B8B3be34588753aBA \\
+  -e RPC_URLS="1=https://eth.llamarpc.com" \\
+  evmfs-gateway`}</CodeBlock>
+        <p style={{ margin: "12px 0 0" }}>
+          Your gateway serves the same URLs. Multiple gateways can coexist — the data is on Ethereum, not on any particular server. If evmfs.xyz goes down, point your base URIs at your own gateway and everything keeps working.
+        </p>
+        <p style={{ margin: "10px 0 0" }}>
+          To enable subdomain resolution, add:<br />
+          <Code>NAMES_CONTRACT=0x3604...</Code> <Code>NAMES_CHAIN_ID=1</Code> <Code>GATEWAY_DOMAIN=yourdomain.com</Code>
+        </p>
       </Section>
 
       <Section title="Source code">

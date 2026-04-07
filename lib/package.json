@@ -1,5 +1,5 @@
 {
-  "name": "evmfs",
+  "name": "evmfs-lib",
   "version": "1.0.0",
   "description": "Fetch files stored on EVMFS (Ethereum event log storage)",
   "type": "module",
