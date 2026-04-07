@@ -104,7 +104,7 @@ function UsersDocs() {
   return (
     <div>
       <Section title="What is EVMFS?">
-        EVMFS stores your files permanently inside Ethereum event logs. You pay gas once at upload and the files stay retrievable forever — no subscription, no pinning service, no ongoing fees. It's designed as a drop-in replacement for IPFS base URIs in NFT contracts.
+        EVMFS stores your files permanently inside Ethereum event logs. You pay gas once at upload and the files stay retrievable forever — no subscription, no pinning service, no ongoing fees.
       </Section>
 
       <Section title="How is this different from IPFS?">
@@ -253,15 +253,6 @@ const bytes = ethers.getBytes(raw);
 // Then gunzip(bytes) to get the original file`}</CodeBlock>
       </Section>
 
-      <Section title="ERC-721 integration">
-        Drop the base URI directly into your NFT contract:
-        <CodeBlock>{`string public baseURI = "https://evmfs.xyz/1/19280143/0xabc.../";
-
-function tokenURI(uint256 tokenId) public view returns (string memory) {
-  return string.concat(baseURI, Strings.toString(tokenId));
-}`}</CodeBlock>
-      </Section>
-
       <Section title="Self-host the gateway">
         <CodeBlock>{`docker build -t evmfs-gateway github.com/devabsnt/evmfs#main:gateway
 
@@ -293,7 +284,7 @@ function lookup(string name) view returns (address, uint64, bytes32)
         <CodeBlock>{`npm install -g evmfs-cli
 
 evmfs deploy --folder ./dist      # deploy a static site
-evmfs upload --folder ./metadata   # upload files (NFT metadata)
+evmfs upload --folder ./metadata   # upload files (numeric indices)
 evmfs register --name mysite \\
   --manifest 0x... --block 12345   # register a subdomain
 evmfs update-name --name mysite \\
@@ -338,7 +329,7 @@ docker run -p 8080:8080 \\
   -e RPC_URLS="1=https://eth.llamarpc.com" \\
   evmfs-gateway`}</CodeBlock>
         <p style={{ margin: "12px 0 0" }}>
-          Your gateway serves the same URLs. Multiple gateways can coexist — the data is on Ethereum, not on any particular server. If evmfs.xyz goes down, point your base URIs at your own gateway and everything keeps working.
+          Your gateway serves the same URLs. Multiple gateways can coexist — the data is on Ethereum, not on any particular server. If evmfs.xyz goes down, point your URLs at your own gateway and everything keeps working.
         </p>
         <p style={{ margin: "10px 0 0" }}>
           To enable subdomain resolution, add:<br />

@@ -279,9 +279,32 @@ func (s *Server) handleNamedSite(w http.ResponseWriter, r *http.Request, name st
 
 	path := strings.TrimPrefix(r.URL.Path, "/")
 	if path == "" {
-		path = "index.html"
+		// Try index.html first, fall back to directory listing
+		s.handleNamedRoot(w, r, info)
+		return
 	}
 	s.handleManifestOrFile(w, r, s.Config.NamesChainId, info.ManifestHash, path, info.BlockNumber)
+}
+
+func (s *Server) handleNamedRoot(w http.ResponseWriter, r *http.Request, info *SiteInfo) {
+	chainId := s.Config.NamesChainId
+	manifestData, err := s.fetchAndDecompress(chainId, info.ManifestHash, info.BlockNumber)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to fetch manifest: %v", err), http.StatusBadGateway)
+		return
+	}
+	entries, err := parseManifest(manifestData)
+	if err != nil {
+		http.Error(w, "failed to parse manifest", http.StatusInternalServerError)
+		return
+	}
+	// If manifest has an index.html, serve it
+	if idx := findByFilename(entries, "index.html"); idx >= 0 {
+		s.handleManifestOrFile(w, r, chainId, info.ManifestHash, "index.html", info.BlockNumber)
+		return
+	}
+	// Otherwise show directory listing
+	s.handleDirectory(w, r, chainId, info.ManifestHash, info.BlockNumber)
 }
 
 func (s *Server) handleDirectory(w http.ResponseWriter, r *http.Request, chainId, manifestHash string, blockHint int64) {
