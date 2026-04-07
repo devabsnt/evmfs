@@ -238,3 +238,27 @@ func abiDecodeBytes(hexData string) ([]byte, error) {
 
 	return data[64 : 64+dataLen], nil
 }
+
+func doRPC(rpcURL string, req jsonRPCRequest, resp *jsonRPCResponse) error {
+	reqBody, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpResp, err := http.Post(rpcURL, "application/json", bytes.NewReader(reqBody))
+	if err != nil {
+		return fmt.Errorf("RPC request failed: %w", err)
+	}
+	defer httpResp.Body.Close()
+
+	body, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+
+	return json.Unmarshal(body, resp)
+}
+
+func jsonUnmarshal(data json.RawMessage, v interface{}) error {
+	return json.Unmarshal(data, v)
+}

@@ -55,6 +55,18 @@ func isBlockNumber(s string) bool {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Check for subdomain-based name resolution (e.g. mysite.evmfs.xyz)
+	if s.Config.GatewayDomain != "" && s.Config.NamesContract != "" {
+		host := strings.Split(r.Host, ":")[0]
+		if strings.HasSuffix(host, "."+s.Config.GatewayDomain) {
+			subdomain := strings.TrimSuffix(host, "."+s.Config.GatewayDomain)
+			if subdomain != "" && !strings.Contains(subdomain, ".") {
+				s.handleNamedSite(w, r, subdomain)
+				return
+			}
+		}
+	}
+
 	rawPath := r.URL.Path
 	trailingSlash := strings.HasSuffix(rawPath, "/") && rawPath != "/"
 	urlPath := strings.TrimSuffix(rawPath, "/")
@@ -255,6 +267,21 @@ func (s *Server) handleManifestOrFile(w http.ResponseWriter, r *http.Request, ch
 		contentType = DetectContentType(data)
 	}
 	s.serveContent(w, data, contentType)
+}
+
+func (s *Server) handleNamedSite(w http.ResponseWriter, r *http.Request, name string) {
+	info, err := s.lookupName(name)
+	if err != nil {
+		log.Printf("name lookup failed for %s: %v", name, err)
+		http.Error(w, fmt.Sprintf("site not found: %s", name), http.StatusNotFound)
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/")
+	if path == "" {
+		path = "index.html"
+	}
+	s.handleManifestOrFile(w, r, s.Config.NamesChainId, info.ManifestHash, path, info.BlockNumber)
 }
 
 func (s *Server) handleDirectory(w http.ResponseWriter, r *http.Request, chainId, manifestHash string, blockHint int64) {

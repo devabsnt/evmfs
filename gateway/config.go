@@ -9,11 +9,14 @@ import (
 )
 
 type Config struct {
-	Port            string              `yaml:"port"`
-	CacheDir        string              `yaml:"cache_dir"`
-	RPCURLs         map[string][]string `yaml:"rpc_urls"`
-	ContractAddress string              `yaml:"contract_address"`
-	StaticDir       string              `yaml:"static_dir"`
+	Port             string              `yaml:"port"`
+	CacheDir         string              `yaml:"cache_dir"`
+	RPCURLs          map[string][]string `yaml:"rpc_urls"`
+	ContractAddress  string              `yaml:"contract_address"`
+	StaticDir        string              `yaml:"static_dir"`
+	NamesContract    string              `yaml:"names_contract"`
+	NamesChainId     string              `yaml:"names_chain_id"`
+	GatewayDomain    string              `yaml:"gateway_domain"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -45,6 +48,16 @@ func LoadConfig() (*Config, error) {
 
 	if staticDir := os.Getenv("STATIC_DIR"); staticDir != "" {
 		cfg.StaticDir = staticDir
+	}
+
+	if namesContract := os.Getenv("NAMES_CONTRACT"); namesContract != "" {
+		cfg.NamesContract = namesContract
+	}
+	if namesChainId := os.Getenv("NAMES_CHAIN_ID"); namesChainId != "" {
+		cfg.NamesChainId = namesChainId
+	}
+	if gatewayDomain := os.Getenv("GATEWAY_DOMAIN"); gatewayDomain != "" {
+		cfg.GatewayDomain = gatewayDomain
 	}
 
 	if rpcURLsEnv := os.Getenv("RPC_URLS"); rpcURLsEnv != "" {
