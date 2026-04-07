@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useWalletClient, usePublicClient, useChainId } from "wagmi";
 import { type Hex } from "viem";
-import { FileDropzone } from "./components/FileDropzone";
+import { FileDropzone, type FileWithPath } from "./components/FileDropzone";
 import { CostEstimate } from "./components/CostEstimate";
 import { UploadProgress } from "./components/UploadProgress";
 import { PrivateKeyInput } from "./components/PrivateKeyInput";
@@ -16,6 +16,7 @@ import { EVMFS_CONTRACT, DEFAULT_RPC_URLS } from "./lib/wagmi";
 import type { SavedUpload } from "./lib/history";
 
 type UploadMode = "wallet" | "privatekey";
+type DeployMode = "files" | "site";
 type Tab = "upload" | "history" | "docs";
 
 interface UploadUIState {
@@ -44,6 +45,8 @@ export default function App() {
 
   const [tab, setTab] = useState<Tab>("upload");
   const [uploadMode, setUploadMode] = useState<UploadMode>("wallet");
+  const [deployMode, setDeployMode] = useState<DeployMode>("files");
+  const [fileRelPaths, setFileRelPaths] = useState<Map<number, string>>(new Map());
   const [pkConfig, setPkConfig] = useState<{ privateKey: string } | null>(null);
   const [customRpcUrl, setCustomRpcUrl] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -60,11 +63,21 @@ export default function App() {
   });
 
   const handleFiles = useCallback(
-    (files: File[]) => {
+    (files: FileWithPath[]) => {
       reset();
-      processFiles(files);
+      if (deployMode === "site") {
+        // Build path map after processing — indices match sorted order
+        const sorted = [...files].sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+        const pathMap = new Map<number, string>();
+        sorted.forEach((f, i) => pathMap.set(i, f.relativePath));
+        setFileRelPaths(pathMap);
+        processFiles(sorted);
+      } else {
+        setFileRelPaths(new Map());
+        processFiles(files);
+      }
     },
-    [processFiles, reset]
+    [processFiles, reset, deployMode]
   );
 
   const createCallbacks = useCallback(
@@ -195,6 +208,8 @@ export default function App() {
 
       setUploadState((s) => ({ ...s, status: isResume ? "Resuming upload..." : "Starting upload..." }));
 
+      const fnames = deployMode === "site" && fileRelPaths.size > 0 ? fileRelPaths : undefined;
+
       if (uploadMode === "privatekey" && pkConfig) {
         await uploadFilesWithPrivateKey(
           result.files,
@@ -205,7 +220,8 @@ export default function App() {
           chainId,
           GATEWAY_URL,
           callbacks,
-          resumeProgress
+          resumeProgress,
+          fnames
         );
       } else if (walletClient && publicClient) {
         await uploadFiles(
@@ -217,7 +233,8 @@ export default function App() {
           chainId,
           GATEWAY_URL,
           callbacks,
-          resumeProgress
+          resumeProgress,
+          fnames
         );
       } else {
         throw new Error("No wallet connected. Please connect your wallet and try again.");
@@ -233,7 +250,7 @@ export default function App() {
         status: `Error: ${msg}`,
       }));
     }
-  }, [result, uploadMode, pkConfig, walletClient, publicClient, chainId, customRpcUrl, createCallbacks]);
+  }, [result, uploadMode, pkConfig, walletClient, publicClient, chainId, customRpcUrl, createCallbacks, deployMode, fileRelPaths]);
 
   const canUpload =
     result &&
@@ -478,6 +495,49 @@ export default function App() {
           </div>
         </div>
 
+        <div style={{ marginBottom: 24 }}>
+          <label style={{ display: "block", color: "#9ca3af", fontSize: 13, marginBottom: 8 }}>
+            Upload mode
+          </label>
+          <div style={{ display: "flex", gap: 0, borderRadius: 8, overflow: "hidden", border: "1px solid #2a2a3a" }}>
+            <button
+              onClick={() => setDeployMode("files")}
+              disabled={isUploading}
+              style={{
+                flex: 1,
+                padding: "10px 16px",
+                background: deployMode === "files" ? "#1e1e2e" : "transparent",
+                color: deployMode === "files" ? "#e0e0e0" : "#6b7280",
+                border: "none",
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: isUploading ? "not-allowed" : "pointer",
+                transition: "all 0.2s ease",
+              }}
+            >
+              Upload files
+            </button>
+            <button
+              onClick={() => setDeployMode("site")}
+              disabled={isUploading}
+              style={{
+                flex: 1,
+                padding: "10px 16px",
+                background: deployMode === "site" ? "#1e1e2e" : "transparent",
+                color: deployMode === "site" ? "#e0e0e0" : "#6b7280",
+                border: "none",
+                borderLeft: "1px solid #2a2a3a",
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: isUploading ? "not-allowed" : "pointer",
+                transition: "all 0.2s ease",
+              }}
+            >
+              Deploy site
+            </button>
+          </div>
+        </div>
+
         {uploadMode === "privatekey" && (
           <div style={{ marginBottom: 24 }}>
             <PrivateKeyInput
@@ -496,7 +556,7 @@ export default function App() {
           </div>
         )}
 
-        <FileDropzone onFiles={handleFiles} disabled={isUploading} />
+        <FileDropzone onFiles={handleFiles} disabled={isUploading} mode={deployMode === "site" ? "folder" : "files"} />
 
         {processing && (
           <div style={{ textAlign: "center", padding: "24px 0", color: "#6b7280", fontSize: 14 }}>
@@ -618,6 +678,7 @@ export default function App() {
             chainId={chainId}
             estimatedGas={result?.totalGas}
             actualGasUsed={uploadState.totalGasUsed}
+            isSiteMode={deployMode === "site"}
           />
         )}
 

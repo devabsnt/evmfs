@@ -1,6 +1,42 @@
 package main
 
-import "strings"
+import (
+	"path/filepath"
+	"strings"
+)
+
+var extToContentType = map[string]string{
+	".html":  "text/html; charset=utf-8",
+	".css":   "text/css; charset=utf-8",
+	".js":    "application/javascript; charset=utf-8",
+	".json":  "application/json",
+	".svg":   "image/svg+xml",
+	".png":   "image/png",
+	".jpg":   "image/jpeg",
+	".jpeg":  "image/jpeg",
+	".gif":   "image/gif",
+	".webp":  "image/webp",
+	".woff2": "font/woff2",
+	".woff":  "font/woff",
+	".wasm":  "application/wasm",
+	".ico":   "image/x-icon",
+	".txt":   "text/plain; charset=utf-8",
+	".xml":   "application/xml",
+	".pdf":   "application/pdf",
+	".map":   "application/json",
+	".mjs":   "application/javascript; charset=utf-8",
+	".ttf":   "font/ttf",
+	".otf":   "font/otf",
+	".eot":   "application/vnd.ms-fontobject",
+}
+
+func contentTypeByExtension(filename string) string {
+	ext := strings.ToLower(filepath.Ext(filename))
+	if ct, ok := extToContentType[ext]; ok {
+		return ct
+	}
+	return ""
+}
 
 func DetectContentType(data []byte) string {
 	if len(data) == 0 {

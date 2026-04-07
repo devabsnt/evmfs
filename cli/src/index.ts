@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { uploadCommand } from "./upload.js";
+import { uploadCommand, deployCommand } from "./upload.js";
 import { verifyCommand } from "./verify.js";
 
 const program = new Command();
@@ -21,6 +21,18 @@ program
   .option("--gas-limit <limit>", "Max gas per transaction", "25000000")
   .option("--gateway <url>", "Gateway base URL", "https://evmfs.xyz")
   .action(uploadCommand);
+
+program
+  .command("deploy")
+  .description("Deploy a static site to EVMFS with named file paths")
+  .requiredOption("--folder <path>", "Path to site folder (e.g. ./dist)")
+  .requiredOption("--rpc <url>", "RPC URL")
+  .requiredOption("--private-key <key>", "Private key for signing transactions")
+  .option("--chain-id <id>", "Chain ID", "1")
+  .option("--contract <address>", "EVMFS contract address")
+  .option("--gas-limit <limit>", "Max gas per transaction", "25000000")
+  .option("--gateway <url>", "Gateway base URL", "https://evmfs.xyz")
+  .action(deployCommand);
 
 program
   .command("verify")

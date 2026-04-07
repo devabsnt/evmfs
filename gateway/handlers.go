@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -63,9 +64,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodGet && urlPath == "/health":
 		s.handleHealth(w, r)
 
-	case r.Method == http.MethodGet && len(segments) == 4 && isChainId(segments[0]) && isBlockNumber(segments[1]) && contentHashRegex.MatchString(segments[2]):
+	case r.Method == http.MethodGet && len(segments) >= 4 && isChainId(segments[0]) && isBlockNumber(segments[1]) && contentHashRegex.MatchString(segments[2]):
 		blockNum, _ := strconv.ParseInt(segments[1], 10, 64)
-		s.handleManifest(w, r, segments[0], segments[2], segments[3], blockNum)
+		pathOrIndex := strings.Join(segments[3:], "/")
+		s.handleManifestOrFile(w, r, segments[0], segments[2], pathOrIndex, blockNum)
 
 	case r.Method == http.MethodGet && len(segments) == 3 && isChainId(segments[0]) && isBlockNumber(segments[1]) && contentHashRegex.MatchString(segments[2]) && trailingSlash:
 		blockNum, _ := strconv.ParseInt(segments[1], 10, 64)
@@ -75,8 +77,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		blockNum, _ := strconv.ParseInt(segments[1], 10, 64)
 		s.handleFile(w, segments[0], segments[2], blockNum)
 
-	case r.Method == http.MethodGet && len(segments) == 3 && isChainId(segments[0]) && contentHashRegex.MatchString(segments[1]):
-		s.handleManifest(w, r, segments[0], segments[1], segments[2], 0)
+	case r.Method == http.MethodGet && len(segments) >= 3 && isChainId(segments[0]) && contentHashRegex.MatchString(segments[1]):
+		pathOrIndex := strings.Join(segments[2:], "/")
+		s.handleManifestOrFile(w, r, segments[0], segments[1], pathOrIndex, 0)
 
 	case r.Method == http.MethodGet && len(segments) == 2 && isChainId(segments[0]) && contentHashRegex.MatchString(segments[1]):
 		s.handleFile(w, segments[0], segments[1], 0)
@@ -116,10 +119,29 @@ type manifestEntry struct {
 	H string          `json:"h,omitempty"`
 	B int64           `json:"b,omitempty"`
 	P []manifestEntry `json:"p,omitempty"`
+	F string          `json:"f,omitempty"`
 }
 
 func (e manifestEntry) isMultipart() bool {
 	return len(e.P) > 0
+}
+
+func hasFilenames(entries []manifestEntry) bool {
+	for _, e := range entries {
+		if e.F != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func findByFilename(entries []manifestEntry, path string) int {
+	for i, e := range entries {
+		if e.F == path {
+			return i
+		}
+	}
+	return -1
 }
 
 func parseManifest(data []byte) ([]manifestEntry, error) {
@@ -142,15 +164,9 @@ func parseManifest(data []byte) ([]manifestEntry, error) {
 	return entries, nil
 }
 
-func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request, chainId, manifestHash, tokenIdStr string, blockHint int64) {
+func (s *Server) handleManifestOrFile(w http.ResponseWriter, r *http.Request, chainId, manifestHash, pathOrIndex string, blockHint int64) {
 	if !contentHashRegex.MatchString(manifestHash) {
 		http.Error(w, "invalid manifest hash: must be 0x + 64 hex characters", http.StatusBadRequest)
-		return
-	}
-
-	tokenId, err := strconv.Atoi(tokenIdStr)
-	if err != nil {
-		http.Error(w, "invalid token ID: must be an integer", http.StatusBadRequest)
 		return
 	}
 
@@ -168,12 +184,41 @@ func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request, chainId,
 		return
 	}
 
-	if tokenId < 0 || tokenId >= len(entries) {
-		http.Error(w, fmt.Sprintf("token ID %d out of range (manifest has %d entries)", tokenId, len(entries)), http.StatusNotFound)
+	// Resolve pathOrIndex to a manifest entry index
+	entryIdx := -1
+	named := hasFilenames(entries)
+
+	if tokenId, err := strconv.Atoi(pathOrIndex); err == nil {
+		if !named {
+			// Old-format manifest: numeric index is primary
+			entryIdx = tokenId
+		} else {
+			// New-format manifest: try filename first, fall back to index
+			entryIdx = findByFilename(entries, pathOrIndex)
+			if entryIdx < 0 {
+				entryIdx = tokenId
+			}
+		}
+	} else {
+		// Non-numeric path: match against f fields
+		entryIdx = findByFilename(entries, pathOrIndex)
+	}
+
+	// SPA fallback: only when named manifest, path not found, and path has no
+	// file extension or extension is .html
+	if entryIdx < 0 && named {
+		ext := filepath.Ext(pathOrIndex)
+		if ext == "" || ext == ".html" {
+			entryIdx = findByFilename(entries, "index.html")
+		}
+	}
+
+	if entryIdx < 0 || entryIdx >= len(entries) {
+		http.Error(w, fmt.Sprintf("file not found: %s (manifest has %d entries)", pathOrIndex, len(entries)), http.StatusNotFound)
 		return
 	}
 
-	entry := entries[tokenId]
+	entry := entries[entryIdx]
 	var data []byte
 	if entry.isMultipart() {
 		for i, part := range entry.P {
@@ -184,7 +229,7 @@ func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request, chainId,
 		}
 		data, err = s.fetchMultipart(chainId, entry.P)
 		if err != nil {
-			log.Printf("error fetching multipart content for token %d of %s/%s: %v", tokenId, chainId, manifestHash, err)
+			log.Printf("error fetching multipart content for %s of %s/%s: %v", pathOrIndex, chainId, manifestHash, err)
 			http.Error(w, fmt.Sprintf("failed to fetch content: %v", err), http.StatusBadGateway)
 			return
 		}
@@ -201,7 +246,14 @@ func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request, chainId,
 		}
 	}
 
-	contentType := DetectContentType(data)
+	// Extension-based content type for named files, magic-byte fallback
+	contentType := ""
+	if entry.F != "" {
+		contentType = contentTypeByExtension(entry.F)
+	}
+	if contentType == "" {
+		contentType = DetectContentType(data)
+	}
 	s.serveContent(w, data, contentType)
 }
 
@@ -281,7 +333,12 @@ tr:hover{background:#13131f}
 </style></head><body>`)
 	sb.WriteString(fmt.Sprintf(`<h1>EVMFS / %s / %s</h1>`, chainId, shortHash))
 	sb.WriteString(fmt.Sprintf(`<p class="sub">%d files &middot; <a href="?format=json">JSON</a></p>`, len(entries)))
-	sb.WriteString(`<table><tr><th>#</th><th>Hash</th></tr>`)
+	named := hasFilenames(entries)
+	if named {
+		sb.WriteString(`<table><tr><th>#</th><th>Name</th><th>Hash</th></tr>`)
+	} else {
+		sb.WriteString(`<table><tr><th>#</th><th>Hash</th></tr>`)
+	}
 
 	for i, e := range entries {
 		var displayHash string
@@ -295,10 +352,17 @@ tr:hover{background:#13131f}
 		if len(displayHash) > 14 {
 			displayHash = displayHash[:10] + "..." + displayHash[len(displayHash)-4:]
 		}
-		sb.WriteString(fmt.Sprintf(
-			`<tr><td><a href="%s%d">%d</a></td><td class="hash">%s%s</td></tr>`,
-			basePath, i, i, displayHash, label,
-		))
+		if named && e.F != "" {
+			sb.WriteString(fmt.Sprintf(
+				`<tr><td>%d</td><td><a href="%s%s">%s</a></td><td class="hash">%s%s</td></tr>`,
+				i, basePath, e.F, e.F, displayHash, label,
+			))
+		} else {
+			sb.WriteString(fmt.Sprintf(
+				`<tr><td><a href="%s%d">%d</a></td><td class="hash">%s%s</td></tr>`,
+				basePath, i, i, displayHash, label,
+			))
+		}
 	}
 
 	sb.WriteString(`</table></body></html>`)

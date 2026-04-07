@@ -15,25 +15,36 @@ export interface ManifestEntry {
 interface ManifestOutputSingle {
   h: string;
   b: number;
+  f?: string;
 }
 
 interface ManifestOutputMultipart {
   p: { h: string; b: number }[];
+  f?: string;
 }
 
 type ManifestOutputEntry = ManifestOutputSingle | ManifestOutputMultipart;
 
-export function buildManifest(entries: ManifestEntry[]): {
+export function buildManifest(
+  entries: ManifestEntry[],
+  includeFilenames = false
+): {
   manifestJson: string;
   manifestGzipped: Uint8Array;
 } {
   const output: ManifestOutputEntry[] = entries.map((e) => {
+    let entry: ManifestOutputEntry;
     if (e.chunks.length === 1) {
-      return { h: e.chunks[0].hash, b: e.chunks[0].block };
+      entry = { h: e.chunks[0].hash, b: e.chunks[0].block };
+    } else {
+      entry = {
+        p: e.chunks.map((c) => ({ h: c.hash, b: c.block })),
+      };
     }
-    return {
-      p: e.chunks.map((c) => ({ h: c.hash, b: c.block })),
-    };
+    if (includeFilenames && e.filename) {
+      entry.f = e.filename;
+    }
+    return entry;
   });
   const manifestJson = JSON.stringify(output);
   const manifestGzipped = gzipSync(Buffer.from(manifestJson));

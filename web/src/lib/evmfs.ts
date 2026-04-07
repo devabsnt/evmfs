@@ -239,14 +239,15 @@ async function readUnit(unit: UploadUnit): Promise<Uint8Array> {
 }
 
 type ManifestOutputEntry =
-  | { h: string; b: number }
-  | { p: { h: string; b: number }[] };
+  | { h: string; b: number; f?: string }
+  | { p: { h: string; b: number }[]; f?: string };
 
 export type { ManifestOutputEntry };
 
 export function buildManifestEntries(
   fileCount: number,
-  confirmed: ConfirmedUnit[]
+  confirmed: ConfirmedUnit[],
+  filenames?: Map<number, string>
 ): ManifestOutputEntry[] {
   const byFile = new Map<number, ConfirmedUnit[]>();
   for (const c of confirmed) {
@@ -261,10 +262,15 @@ export function buildManifestEntries(
     if (chunks.length === 0) {
       throw new Error(`missing chunks for file index ${i}`);
     }
+    const fname = filenames?.get(i);
     if (chunks.length === 1 && chunks[0].totalChunks === 1) {
-      out.push({ h: chunks[0].hash, b: chunks[0].block });
+      const entry: ManifestOutputEntry = { h: chunks[0].hash, b: chunks[0].block };
+      if (fname) entry.f = fname;
+      out.push(entry);
     } else {
-      out.push({ p: chunks.map((c) => ({ h: c.hash, b: c.block })) });
+      const entry: ManifestOutputEntry = { p: chunks.map((c) => ({ h: c.hash, b: c.block })) };
+      if (fname) entry.f = fname;
+      out.push(entry);
     }
   }
   return out;
@@ -300,7 +306,8 @@ export async function uploadFiles(
   chainId: number,
   gatewayUrl: string,
   callbacks: UploadCallbacks,
-  savedProgress?: SavedProgress | null
+  savedProgress?: SavedProgress | null,
+  filenames?: Map<number, string>
 ): Promise<{ manifestHash: string; confirmed: ConfirmedUnit[] }> {
   const confirmed = new Map<string, ConfirmedUnit>();
   const account = walletClient.account;
@@ -416,7 +423,7 @@ export async function uploadFiles(
   const confirmedList = [...confirmed.values()];
   console.log(`[evmfs] uploading manifest for ${files.length} files (${confirmedList.length} chunks)`);
 
-  const manifestEntries = buildManifestEntries(files.length, confirmedList);
+  const manifestEntries = buildManifestEntries(files.length, confirmedList, filenames);
   const manifestJson = JSON.stringify(manifestEntries);
   const manifestRaw = new TextEncoder().encode(manifestJson);
   const manifestBytes = await gzipCompress(manifestRaw);
@@ -463,7 +470,8 @@ export async function uploadFilesWithPrivateKey(
   chainId: number,
   gatewayUrl: string,
   callbacks: UploadCallbacks,
-  savedProgress?: SavedProgress | null
+  savedProgress?: SavedProgress | null,
+  filenames?: Map<number, string>
 ): Promise<{ manifestHash: string; confirmed: ConfirmedUnit[] }> {
   const { ethers } = await import("ethers");
 
@@ -603,7 +611,7 @@ export async function uploadFilesWithPrivateKey(
   const confirmedList = [...confirmed.values()];
   console.log(`[evmfs] uploading manifest for ${files.length} files (${confirmedList.length} chunks)`);
 
-  const manifestEntries = buildManifestEntries(files.length, confirmedList);
+  const manifestEntries = buildManifestEntries(files.length, confirmedList, filenames);
   const manifestJson = JSON.stringify(manifestEntries);
   const manifestRaw = new TextEncoder().encode(manifestJson);
   const manifestBytes = await gzipCompress(manifestRaw);
