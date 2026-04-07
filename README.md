@@ -63,24 +63,84 @@ This is the same pattern Uniswap uses: free contract, hosted frontend earns its 
 
 ## Quick start
 
+### CLI
+
+```bash
+# Install
+npm install -g evmfs-cli
+
+# Set env vars (or pass as flags)
+export EVMFS_RPC=https://eth.llamarpc.com
+export EVMFS_PRIVATE_KEY=0x...
+export EVMFS_CONTRACT=0x140cbDFf649929D003091a5B8B3be34588753aBA
+
+# Deploy a static site (preserves file paths)
+evmfs deploy --folder ./dist
+
+# Upload files (numeric indices, for NFT metadata)
+evmfs upload --folder ./metadata
+
+# Verify / inspect
+evmfs verify --hash 0x...
+evmfs info --hash 0x...
+```
+
+Or run without installing: `npx evmfs-cli deploy --folder ./dist`
+
+#### Environment variables
+
+All flags can be set via environment variables. Flags override env vars when both are present.
+
+| Env variable | Flag | Default |
+|---|---|---|
+| `EVMFS_RPC` | `--rpc` | *(required)* |
+| `EVMFS_PRIVATE_KEY` | `--private-key` | *(required)* |
+| `EVMFS_CONTRACT` | `--contract` | — |
+| `EVMFS_CHAIN_ID` | `--chain-id` | `1` |
+| `EVMFS_GATEWAY` | `--gateway` | `https://evmfs.xyz` |
+| `EVMFS_GAS_LIMIT` | `--gas-limit` | `25000000` |
+
+#### Static site hosting
+
+`evmfs deploy` recursively walks a folder and stores each file with its relative path in the manifest. The gateway serves files by path with extension-based content types and SPA fallback:
+
+```
+https://evmfs.xyz/{chainId}/{block}/{manifestHash}/index.html
+https://evmfs.xyz/{chainId}/{block}/{manifestHash}/assets/style.css
+```
+
 ### Web UI
 
 1. Go to https://evmfs.xyz
 2. Connect wallet (MetaMask, WalletConnect, etc.) or paste a private key for auto-signing thousands of files
-3. Drop your folder of files
-4. Review the live cost estimate (fetches gas price + ETH price every 30s)
-5. Click Upload — batches sign one at a time, progress saves to localStorage so you can resume if interrupted
-6. Copy the base URI and paste it into your NFT contract
+3. Choose **Upload files** (NFT metadata) or **Deploy site** (static site with paths)
+4. Drop your files or folder
+5. Review the live cost estimate (fetches gas price + ETH price every 30s)
+6. Click Upload — batches sign one at a time, progress saves to localStorage so you can resume if interrupted
+7. Copy the base URI and paste it into your NFT contract, or click "Visit site" for deployed sites
 
-### CLI
+### JavaScript library
 
 ```bash
-evmfs upload --folder ./images --rpc <url> --private-key <key>
-evmfs verify --hash 0x... --rpc <url>
-evmfs info --hash 0x... --rpc <url>
+npm install evmfs
 ```
 
-Same upload logic as the web UI, same resume capability, no browser required.
+```javascript
+import { EVMFS } from "evmfs";
+
+const fs = new EVMFS({
+  rpc: "https://eth.llamarpc.com",
+  contract: "0x140cbDFf649929D003091a5B8B3be34588753aBA"
+});
+
+// Fetch a single file by path
+const html = await fs.fetch(manifestHash, blockNum, "index.html");
+
+// Fetch all files with concurrency control
+const files = await fs.fetchAll(manifestHash, blockNum, { concurrency: 5 });
+```
+
+Zero required dependencies. Works in Node 18+ and modern browsers. Optional `@noble/hashes` peer dep for keccak256 hash verification.
 
 ### Security note on auto-signing
 
@@ -168,8 +228,10 @@ Both deployed via CREATE2. Addresses differ because the two deploys used differe
 
 ```
 contracts/      Solidity contract + Foundry tests
-cli/            TypeScript CLI for scripted uploads
+cli/            TypeScript CLI (npm: evmfs-cli)
+lib/            Standalone JS library (npm: evmfs)
 gateway/        Go HTTP gateway (stateless, cacheable)
 web/            React web UI (wagmi + RainbowKit)
+demo-site/      Example static site for deploying to EVMFS
 scripts/        Deployment scripts (mainnet + sepolia)
 ```
