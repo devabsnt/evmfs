@@ -619,6 +619,7 @@ function printDeployResult(options: DeployOptions, state: UploadState, files: st
   console.log(`  Files: ${files.length}`);
   console.log(`  Chunks stored: ${state.chunks.length}`);
   console.log(`  Manifest hash: ${state.manifestHash}`);
+  console.log(`  Block number: ${blockNum}`);
   console.log(`  Site URL: ${siteUrl}`);
   console.log(`\nTo update your site, redeploy and update your DNS/ENS to point to the new manifest.`);
   console.log(`Each deploy produces a new immutable manifest — content on-chain never changes.`);
@@ -626,12 +627,14 @@ function printDeployResult(options: DeployOptions, state: UploadState, files: st
 
 function printResult(options: UploadOptions, state: UploadState): void {
   const fileCount = new Set(state.chunks.map((c) => c.fileIndex)).size;
+  const blockNum = state.chunks.length > 0 ? state.chunks[0].block : 0;
   console.log(`\n✓ Upload complete!`);
   console.log(`  Files: ${fileCount}`);
   console.log(`  Chunks stored: ${state.chunks.length}`);
   console.log(`  Manifest hash: ${state.manifestHash}`);
+  console.log(`  Block number: ${blockNum}`);
   console.log(
-    `  Base URI: ${options.gateway}/${options.chainId}/${state.manifestHash}/`
+    `  Base URI: ${options.gateway}/${options.chainId}/${blockNum}/${state.manifestHash}/`
   );
   console.log(
     `\n  Token 0: ${options.gateway}/${options.chainId}/${state.manifestHash}/0`

@@ -332,8 +332,17 @@ docker run -p 8080:8080 \\
           Your gateway serves the same URLs. Multiple gateways can coexist — the data is on Ethereum, not on any particular server. If evmfs.xyz goes down, point your URLs at your own gateway and everything keeps working.
         </p>
         <p style={{ margin: "10px 0 0" }}>
-          To enable subdomain resolution, add:<br />
-          <Code>NAMES_CONTRACT=0x3604...</Code> <Code>NAMES_CHAIN_ID=1</Code> <Code>GATEWAY_DOMAIN=yourdomain.com</Code>
+          To enable subdomain resolution, add these env vars and a wildcard DNS record:
+        </p>
+        <CodeBlock>{`# Gateway env vars
+NAMES_CONTRACT=0x36043906ba7c191c9511a60a8b28e3a602ed1477
+NAMES_CHAIN_ID=1
+GATEWAY_DOMAIN=yourdomain.com
+
+# DNS — add a wildcard CNAME pointing to your gateway
+*   CNAME   your-gateway-host.example.com`}</CodeBlock>
+        <p style={{ margin: "10px 0 0" }}>
+          All registered names resolve from the same on-chain registry — <Code>mysite.yourdomain.com</Code> serves the same content as <Code>mysite.evmfs.xyz</Code>.
         </p>
       </Section>
 
