@@ -248,6 +248,32 @@ export default function App() {
                 <div style={s.listItem}>First come, first served</div>
               </div>
             </div>
+            <div style={s.guideSection}>
+              <h2 style={s.guideH}>Custom domains</h2>
+              <p style={s.guideP}>
+                Want to use your own domain instead of yourname.evmfs.xyz? You can point any domain at your
+                EVMFS site using a reverse proxy that rewrites the Host header. Cloudflare's free tier is
+                the easiest option.
+              </p>
+              <div style={s.guideCode}>
+                <div><span style={s.stepNum}>1</span> Add your domain to Cloudflare (free plan)</div>
+                <div style={s.codeLine}>Update nameservers at your registrar</div>
+                <div style={{ height: 12 }} />
+                <div><span style={s.stepNum}>2</span> Create a CNAME record</div>
+                <div style={s.codeLine}>@ → yourname.evmfs.xyz (Proxy ON)</div>
+                <div style={{ height: 12 }} />
+                <div><span style={s.stepNum}>3</span> Add an Origin Rule</div>
+                <div style={s.codeLine}>Rewrite Host Header → yourname.evmfs.xyz</div>
+                <div style={{ height: 12 }} />
+                <div><span style={s.stepNum}>4</span> Set SSL to Full (strict)</div>
+                <div style={s.codeLine}>Done - https://yourdomain.com is live</div>
+              </div>
+              <p style={{...s.guideP, marginTop: 12}}>
+                Also works with Caddy, nginx, or any reverse proxy. See the full guide in the developer docs at{" "}
+                <a href="https://evmfs.xyz" target="_blank" rel="noopener noreferrer" style={s.link}>evmfs.xyz</a>.
+              </p>
+            </div>
+
             <button onClick={() => setView("register")} style={s.ctaBtn}>Register a name</button>
           </div>
         )}
