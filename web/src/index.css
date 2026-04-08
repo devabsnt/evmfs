@@ -11,26 +11,27 @@ html {
 
 body {
   margin: 0;
-  background: #0f0f1a;
-  color: #e0e0e0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #141416;
+  color: #c2c2c8;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
 }
 
 a {
-  color: #5b7def;
-  text-decoration: none;
+  color: #a0a0aa;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 a:hover {
-  text-decoration: underline;
+  color: #ededf0;
 }
 
 ::selection {
-  background: rgba(91, 125, 239, 0.3);
+  background: rgba(160, 160, 170, 0.3);
 }
 
 input::placeholder {
-  color: #4b5563;
+  color: #444448;
 }
 
 ::-webkit-scrollbar {
@@ -42,6 +43,6 @@ input::placeholder {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2a2a3a;
-  border-radius: 3px;
+  background: #2a2a30;
+  border-radius: 0;
 }

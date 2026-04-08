@@ -263,12 +263,12 @@ export default function App() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "#0f0f1a",
-      color: "#e0e0e0",
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      background: "#141416",
+      color: "#ededf0",
+      fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
     }}>
       <header style={{
-        borderBottom: "1px solid #1e1e2e",
+        borderBottom: "1px solid #222228",
         padding: "0 32px",
       }}>
         <div style={{
@@ -281,7 +281,7 @@ export default function App() {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em" }}>EVMFS</span>
-            <span style={{ color: "#6b7280", fontSize: 13 }}>Permanent file storage</span>
+            <span style={{ color: "#606068", fontSize: 13 }}>Permanent file storage</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <button
@@ -290,7 +290,7 @@ export default function App() {
                 background: "none",
                 border: "none",
                 cursor: "pointer",
-                color: settingsOpen ? "#5b7def" : "#6b7280",
+                color: settingsOpen ? "#ededf0" : "#606068",
                 padding: 4,
                 display: "flex",
                 alignItems: "center",
@@ -309,14 +309,14 @@ export default function App() {
 
       {settingsOpen && (
         <div style={{
-          borderBottom: "1px solid #1e1e2e",
+          borderBottom: "1px solid #222228",
           padding: "16px 32px",
-          background: "#13131f",
+          background: "#18181c",
         }}>
           <div style={{ maxWidth: 720, margin: "0 auto" }}>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", color: "#9ca3af", fontSize: 13, marginBottom: 6 }}>
-                Custom RPC URL <span style={{ color: "#4b5563" }}>(optional — used for both upload modes)</span>
+              <label style={{ display: "block", color: "#78787e", fontSize: 13, marginBottom: 6 }}>
+                Custom RPC URL <span style={{ color: "#606068" }}>(optional - used for both upload modes)</span>
               </label>
               <input
                 type="text"
@@ -327,10 +327,10 @@ export default function App() {
                 style={{
                   width: "100%",
                   padding: "10px 12px",
-                  background: "#1a1a2e",
-                  border: "1px solid #2a2a3a",
-                  borderRadius: 8,
-                  color: "#e0e0e0",
+                  background: "#1c1c20",
+                  border: "1px solid #2a2a30",
+                  borderRadius: 0,
+                  color: "#ededf0",
                   fontSize: 14,
                   fontFamily: "'JetBrains Mono', monospace",
                   outline: "none",
@@ -347,7 +347,7 @@ export default function App() {
           <h1 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 8px", letterSpacing: "-0.02em" }}>
             Upload files to the blockchain
           </h1>
-          <p style={{ color: "#6b7280", fontSize: 15, margin: 0, lineHeight: 1.6 }}>
+          <p style={{ color: "#606068", fontSize: 15, margin: 0, lineHeight: 1.6 }}>
             Files are stored permanently in Ethereum event logs.
             Pay once, stored forever. A drop-in replacement for IPFS.
           </p>
@@ -356,9 +356,9 @@ export default function App() {
         <div style={{
           display: "flex",
           gap: 0,
-          borderRadius: 8,
+          borderRadius: 0,
           overflow: "hidden",
-          border: "1px solid #1e1e2e",
+          border: "1px solid #222228",
           marginBottom: 28,
         }}>
           <button
@@ -366,8 +366,8 @@ export default function App() {
             style={{
               flex: 1,
               padding: "10px 16px",
-              background: tab === "upload" ? "#1e1e2e" : "transparent",
-              color: tab === "upload" ? "#e0e0e0" : "#6b7280",
+              background: tab === "upload" ? "#222228" : "transparent",
+              color: tab === "upload" ? "#ededf0" : "#606068",
               border: "none",
               fontSize: 14,
               fontWeight: 500,
@@ -382,10 +382,10 @@ export default function App() {
             style={{
               flex: 1,
               padding: "10px 16px",
-              background: tab === "history" ? "#1e1e2e" : "transparent",
-              color: tab === "history" ? "#e0e0e0" : "#6b7280",
+              background: tab === "history" ? "#222228" : "transparent",
+              color: tab === "history" ? "#ededf0" : "#606068",
               border: "none",
-              borderLeft: "1px solid #1e1e2e",
+              borderLeft: "1px solid #222228",
               fontSize: 14,
               fontWeight: 500,
               cursor: "pointer",
@@ -399,10 +399,10 @@ export default function App() {
             style={{
               flex: 1,
               padding: "10px 16px",
-              background: tab === "docs" ? "#1e1e2e" : "transparent",
-              color: tab === "docs" ? "#e0e0e0" : "#6b7280",
+              background: tab === "docs" ? "#222228" : "transparent",
+              color: tab === "docs" ? "#ededf0" : "#606068",
               border: "none",
-              borderLeft: "1px solid #1e1e2e",
+              borderLeft: "1px solid #222228",
               fontSize: 14,
               fontWeight: 500,
               cursor: "pointer",
@@ -427,12 +427,12 @@ export default function App() {
         {tab === "upload" && <>
         <div style={{
           padding: "10px 14px",
-          background: "rgba(91, 125, 239, 0.06)",
-          borderRadius: 8,
-          border: "1px solid rgba(91, 125, 239, 0.15)",
+          background: "rgba(160, 160, 170, 0.06)",
+          borderRadius: 0,
+          border: "1px solid rgba(160, 160, 170, 0.12)",
           marginBottom: 20,
           fontSize: 13,
-          color: "#9ca3af",
+          color: "#78787e",
           lineHeight: 1.5,
         }}>
           Your files are stored on Ethereum, not on this site.{" "}
@@ -441,11 +441,12 @@ export default function App() {
             style={{
               background: "none",
               border: "none",
-              color: "#5b7def",
+              color: "#a0a0aa",
               cursor: "pointer",
               padding: 0,
               font: "inherit",
               textDecoration: "underline",
+              textUnderlineOffset: "3px",
             }}
           >
             How does that work?
@@ -453,18 +454,18 @@ export default function App() {
         </div>
 
         <div style={{ marginBottom: 24 }}>
-          <label style={{ display: "block", color: "#9ca3af", fontSize: 13, marginBottom: 8 }}>
+          <label style={{ display: "block", color: "#78787e", fontSize: 13, marginBottom: 8 }}>
             Signing method
           </label>
-          <div style={{ display: "flex", gap: 0, borderRadius: 8, overflow: "hidden", border: "1px solid #2a2a3a" }}>
+          <div style={{ display: "flex", gap: 0, borderRadius: 0, overflow: "hidden", border: "1px solid #2a2a30" }}>
             <button
               onClick={() => setUploadMode("wallet")}
               disabled={isUploading}
               style={{
                 flex: 1,
                 padding: "10px 16px",
-                background: uploadMode === "wallet" ? "#1e1e2e" : "transparent",
-                color: uploadMode === "wallet" ? "#e0e0e0" : "#6b7280",
+                background: uploadMode === "wallet" ? "#222228" : "transparent",
+                color: uploadMode === "wallet" ? "#ededf0" : "#606068",
                 border: "none",
                 fontSize: 13,
                 fontWeight: 500,
@@ -480,10 +481,10 @@ export default function App() {
               style={{
                 flex: 1,
                 padding: "10px 16px",
-                background: uploadMode === "privatekey" ? "#1e1e2e" : "transparent",
-                color: uploadMode === "privatekey" ? "#e0e0e0" : "#6b7280",
+                background: uploadMode === "privatekey" ? "#222228" : "transparent",
+                color: uploadMode === "privatekey" ? "#ededf0" : "#606068",
                 border: "none",
-                borderLeft: "1px solid #2a2a3a",
+                borderLeft: "1px solid #2a2a30",
                 fontSize: 13,
                 fontWeight: 500,
                 cursor: isUploading ? "not-allowed" : "pointer",
@@ -496,18 +497,18 @@ export default function App() {
         </div>
 
         <div style={{ marginBottom: 24 }}>
-          <label style={{ display: "block", color: "#9ca3af", fontSize: 13, marginBottom: 8 }}>
+          <label style={{ display: "block", color: "#78787e", fontSize: 13, marginBottom: 8 }}>
             Upload mode
           </label>
-          <div style={{ display: "flex", gap: 0, borderRadius: 8, overflow: "hidden", border: "1px solid #2a2a3a" }}>
+          <div style={{ display: "flex", gap: 0, borderRadius: 0, overflow: "hidden", border: "1px solid #2a2a30" }}>
             <button
               onClick={() => setDeployMode("files")}
               disabled={isUploading}
               style={{
                 flex: 1,
                 padding: "10px 16px",
-                background: deployMode === "files" ? "#1e1e2e" : "transparent",
-                color: deployMode === "files" ? "#e0e0e0" : "#6b7280",
+                background: deployMode === "files" ? "#222228" : "transparent",
+                color: deployMode === "files" ? "#ededf0" : "#606068",
                 border: "none",
                 fontSize: 13,
                 fontWeight: 500,
@@ -523,10 +524,10 @@ export default function App() {
               style={{
                 flex: 1,
                 padding: "10px 16px",
-                background: deployMode === "site" ? "#1e1e2e" : "transparent",
-                color: deployMode === "site" ? "#e0e0e0" : "#6b7280",
+                background: deployMode === "site" ? "#222228" : "transparent",
+                color: deployMode === "site" ? "#ededf0" : "#606068",
                 border: "none",
-                borderLeft: "1px solid #2a2a3a",
+                borderLeft: "1px solid #2a2a30",
                 fontSize: 13,
                 fontWeight: 500,
                 cursor: isUploading ? "not-allowed" : "pointer",
@@ -556,15 +557,15 @@ export default function App() {
             <div style={{
               marginTop: 10,
               padding: "8px 12px",
-              background: "rgba(91, 125, 239, 0.06)",
-              borderRadius: 6,
-              border: "1px solid rgba(91, 125, 239, 0.12)",
+              background: "rgba(160, 160, 170, 0.06)",
+              borderRadius: 0,
+              border: "1px solid rgba(160, 160, 170, 0.08)",
               fontSize: 12,
-              color: "#6b7280",
+              color: "#606068",
               lineHeight: 1.5,
             }}>
               Prefer not to enter a key in the browser? Use the CLI instead:{" "}
-              <code style={{ color: "#9ca3af", fontSize: 11 }}>npm install -g evmfs-cli</code>
+              <code style={{ color: "#78787e", fontSize: 11 }}>npm install -g evmfs-cli</code>
             </div>
           </div>
         )}
@@ -572,7 +573,7 @@ export default function App() {
         <FileDropzone onFiles={handleFiles} disabled={isUploading} mode={deployMode === "site" ? "folder" : "files"} />
 
         {processing && (
-          <div style={{ textAlign: "center", padding: "24px 0", color: "#6b7280", fontSize: 14 }}>
+          <div style={{ textAlign: "center", padding: "24px 0", color: "#606068", fontSize: 14 }}>
             Compressing files...
           </div>
         )}
@@ -595,19 +596,19 @@ export default function App() {
               return (
                 <div style={{
                   padding: "14px 16px",
-                  background: "rgba(91, 125, 239, 0.08)",
-                  borderRadius: 8,
-                  border: "1px solid rgba(91, 125, 239, 0.2)",
+                  background: "rgba(160, 160, 170, 0.08)",
+                  borderRadius: 0,
+                  border: "1px solid rgba(160, 160, 170, 0.15)",
                   marginBottom: 12,
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
                 }}>
                   <div>
-                    <div style={{ color: "#d1d5db", fontSize: 14, fontWeight: 500 }}>
+                    <div style={{ color: "#c2c2c8", fontSize: 14, fontWeight: 500 }}>
                       Previous upload found ({saved.confirmed.length}/{result.totalUnits} {partLabel}, {pct}%)
                     </div>
-                    <div style={{ color: "#6b7280", fontSize: 12, marginTop: 2 }}>
+                    <div style={{ color: "#606068", fontSize: 12, marginTop: 2 }}>
                       Resume to skip already-confirmed batches
                     </div>
                   </div>
@@ -617,10 +618,10 @@ export default function App() {
                       disabled={!canUpload}
                       style={{
                         padding: "8px 16px",
-                        background: "#5b7def",
-                        color: "#fff",
+                        background: "#ededf0",
+                        color: "#141416",
                         border: "none",
-                        borderRadius: 6,
+                        borderRadius: 0,
                         fontSize: 13,
                         fontWeight: 500,
                         cursor: canUpload ? "pointer" : "not-allowed",
@@ -633,9 +634,9 @@ export default function App() {
                       style={{
                         padding: "8px 12px",
                         background: "transparent",
-                        color: "#6b7280",
-                        border: "1px solid #2a2a3a",
-                        borderRadius: 6,
+                        color: "#606068",
+                        border: "1px solid #2a2a30",
+                        borderRadius: 0,
                         fontSize: 13,
                         cursor: "pointer",
                       }}
@@ -654,11 +655,11 @@ export default function App() {
                 width: "100%",
                 padding: "14px 24px",
                 background: canUpload
-                  ? "linear-gradient(135deg, #5b7def, #8b5cf6)"
-                  : "#2a2a3a",
-                color: canUpload ? "#fff" : "#6b7280",
+                  ? "#ededf0"
+                  : "#222228",
+                color: canUpload ? "#141416" : "#606068",
                 border: "none",
-                borderRadius: 10,
+                borderRadius: 0,
                 fontSize: 15,
                 fontWeight: 600,
                 cursor: canUpload ? "pointer" : "not-allowed",
@@ -698,12 +699,12 @@ export default function App() {
         {uploadState.phase === "error" && uploadState.error && (
           <div style={{
             padding: "14px 16px",
-            background: "rgba(239, 68, 68, 0.08)",
-            borderRadius: 8,
-            border: "1px solid rgba(239, 68, 68, 0.2)",
+            background: "rgba(208, 80, 80, 0.08)",
+            borderRadius: 0,
+            border: "1px solid rgba(208, 80, 80, 0.15)",
             marginTop: 16,
           }}>
-            <p style={{ color: "#ef4444", fontSize: 14, margin: 0 }}>{uploadState.error}</p>
+            <p style={{ color: "#d05050", fontSize: 14, margin: 0 }}>{uploadState.error}</p>
             <button
               onClick={() =>
                 setUploadState({
@@ -719,10 +720,10 @@ export default function App() {
               style={{
                 marginTop: 10,
                 padding: "6px 14px",
-                background: "#2a2a3a",
-                color: "#d1d5db",
+                background: "#222228",
+                color: "#c2c2c8",
                 border: "none",
-                borderRadius: 6,
+                borderRadius: 0,
                 fontSize: 13,
                 cursor: "pointer",
               }}
@@ -735,12 +736,13 @@ export default function App() {
       </main>
 
       <footer style={{
-        borderTop: "1px solid #1e1e2e",
+        borderTop: "1px solid #222228",
         padding: "20px 32px",
         textAlign: "center",
       }}>
-        <p style={{ color: "#4b5563", fontSize: 12, margin: 0 }}>
-          EVMFS is open source. Your data is stored permanently on-chain. No ongoing fees, no dependencies.
+        <p style={{ color: "#606068", fontSize: 12, margin: 0 }}>
+          EVMFS is open source &middot;{" "}
+          <a href="https://names.evmfs.xyz" style={{ color: "#a0a0aa", textDecoration: "underline", textUnderlineOffset: "3px" }}>names.evmfs.xyz</a>
         </p>
       </footer>
     </div>

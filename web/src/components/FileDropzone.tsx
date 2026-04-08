@@ -155,12 +155,12 @@ export function FileDropzone({ onFiles, disabled, mode = "files" }: FileDropzone
       onDrop={handleDrop}
       onClick={() => !disabled && inputRef.current?.click()}
       style={{
-        border: `2px dashed ${dragActive ? "#5b7def" : "#3a3a4a"}`,
-        borderRadius: 12,
+        border: `2px dashed ${dragActive ? "#a0a0aa" : "#3a3a4a"}`,
+        borderRadius: 0,
         padding: "48px 32px",
         textAlign: "center",
         cursor: disabled ? "not-allowed" : "pointer",
-        background: dragActive ? "rgba(91, 125, 239, 0.05)" : "transparent",
+        background: dragActive ? "rgba(160, 160, 170, 0.05)" : "transparent",
         transition: "all 0.2s ease",
         opacity: disabled ? 0.5 : 1,
       }}
@@ -175,7 +175,7 @@ export function FileDropzone({ onFiles, disabled, mode = "files" }: FileDropzone
         {...inputProps}
       />
       <div style={{ fontSize: 40, marginBottom: 12, lineHeight: 1 }}>
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#606068" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           {isFolder ? (
             <>
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
@@ -191,10 +191,10 @@ export function FileDropzone({ onFiles, disabled, mode = "files" }: FileDropzone
           )}
         </svg>
       </div>
-      <p style={{ color: "#e0e0e0", fontSize: 16, margin: "0 0 8px" }}>
+      <p style={{ color: "#ededf0", fontSize: 16, margin: "0 0 8px" }}>
         {isFolder ? "Drop a folder here or click to browse" : "Drop files here or click to browse"}
       </p>
-      <p style={{ color: "#6b7280", fontSize: 13, margin: 0 }}>
+      <p style={{ color: "#606068", fontSize: 13, margin: 0 }}>
         {isFolder
           ? "Directory structure and filenames are preserved in the manifest."
           : "Supports any file type. Files are sorted alphanumerically (index = tokenId)."}

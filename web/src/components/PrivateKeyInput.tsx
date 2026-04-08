@@ -16,22 +16,22 @@ export function PrivateKeyInput({ onSubmit, disabled }: PrivateKeyInputProps) {
       <div style={{
         padding: "14px 16px",
         background: "rgba(234, 179, 8, 0.08)",
-        borderRadius: 8,
+        borderRadius: 0,
         border: "1px solid rgba(234, 179, 8, 0.2)",
         marginBottom: 16,
         fontSize: 13,
         lineHeight: 1.5,
-        color: "#d1d5db",
+        color: "#c2c2c8",
       }}>
         <strong style={{ color: "#eab308" }}>Security note:</strong> Your private key stays in your
         browser and is never sent to any server. It's only used locally to sign transactions, and is
-        discarded when you close or refresh this page. Even so — for safety, create a new wallet
+        discarded when you close or refresh this page. Even so - for safety, create a new wallet
         specifically for uploading. Transfer only the ETH needed for the upload, then discard the key.
         Never use a wallet that holds significant funds.
       </div>
 
       <div style={{ marginBottom: 12 }}>
-        <label style={{ display: "block", color: "#9ca3af", fontSize: 13, marginBottom: 6 }}>
+        <label style={{ display: "block", color: "#78787e", fontSize: 13, marginBottom: 6 }}>
           Private key
         </label>
         <div style={{ position: "relative" }}>
@@ -44,10 +44,10 @@ export function PrivateKeyInput({ onSubmit, disabled }: PrivateKeyInputProps) {
             style={{
               width: "100%",
               padding: "10px 40px 10px 12px",
-              background: "#1a1a2e",
-              border: "1px solid #2a2a3a",
-              borderRadius: 8,
-              color: "#e0e0e0",
+              background: "#1c1c20",
+              border: "1px solid #2a2a30",
+              borderRadius: 0,
+              color: "#ededf0",
               fontSize: 14,
               fontFamily: "'JetBrains Mono', monospace",
               outline: "none",
@@ -65,7 +65,7 @@ export function PrivateKeyInput({ onSubmit, disabled }: PrivateKeyInputProps) {
               background: "none",
               border: "none",
               cursor: "pointer",
-              color: "#6b7280",
+              color: "#606068",
               padding: 4,
             }}
           >
@@ -90,10 +90,10 @@ export function PrivateKeyInput({ onSubmit, disabled }: PrivateKeyInputProps) {
         style={{
           width: "100%",
           padding: "10px 16px",
-          background: isValid && !disabled ? "#5b7def" : "#2a2a3a",
-          color: isValid && !disabled ? "#fff" : "#6b7280",
+          background: isValid && !disabled ? "#ededf0" : "#2a2a30",
+          color: isValid && !disabled ? "#141416" : "#606068",
           border: "none",
-          borderRadius: 8,
+          borderRadius: 0,
           fontSize: 14,
           fontWeight: 500,
           cursor: isValid && !disabled ? "pointer" : "not-allowed",

@@ -44,16 +44,16 @@ export function UploadProgress({
       {phase !== "complete" && (
         <>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <span style={{ color: "#d1d5db", fontSize: 14 }}>{status}</span>
-            <span style={{ color: "#6b7280", fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ color: "#c2c2c8", fontSize: 14 }}>{status}</span>
+            <span style={{ color: "#606068", fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}>
               {Math.round(overallProgress)}%
             </span>
           </div>
 
           <div style={{
             height: 6,
-            background: "#2a2a3a",
-            borderRadius: 3,
+            background: "#2a2a30",
+            borderRadius: 0,
             overflow: "hidden",
             marginBottom: 16,
           }}>
@@ -61,8 +61,8 @@ export function UploadProgress({
               style={{
                 height: "100%",
                 width: `${overallProgress}%`,
-                background: "linear-gradient(90deg, #5b7def, #8b5cf6)",
-                borderRadius: 3,
+                background: "#ededf0",
+                borderRadius: 0,
                 transition: "width 0.5s ease",
               }}
             />
@@ -70,13 +70,13 @@ export function UploadProgress({
 
           {currentTxHash && (
             <div style={{ marginBottom: 12 }}>
-              <span style={{ color: "#6b7280", fontSize: 12 }}>Transaction: </span>
+              <span style={{ color: "#606068", fontSize: 12 }}>Transaction: </span>
               <a
                 href={getTxExplorerUrl(chainId, currentTxHash)}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
-                  color: "#5b7def",
+                  color: "#a0a0aa",
                   fontSize: 12,
                   fontFamily: "'JetBrains Mono', monospace",
                   textDecoration: "none",
@@ -87,7 +87,7 @@ export function UploadProgress({
             </div>
           )}
 
-          <div style={{ color: "#6b7280", fontSize: 13 }}>
+          <div style={{ color: "#606068", fontSize: 13 }}>
             {completedFiles} / {totalFiles} parts uploaded
           </div>
         </>
@@ -109,14 +109,14 @@ export function UploadProgress({
           </div>
 
           <div style={{ marginBottom: 16 }}>
-            <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 4 }}>Manifest hash</div>
+            <div style={{ color: "#606068", fontSize: 12, marginBottom: 4 }}>Manifest hash</div>
             <code style={{
-              color: "#d1d5db",
+              color: "#c2c2c8",
               fontSize: 13,
               fontFamily: "'JetBrains Mono', monospace",
-              background: "#1a1a2e",
+              background: "#1c1c20",
               padding: "8px 12px",
-              borderRadius: 6,
+              borderRadius: 0,
               display: "block",
               wordBreak: "break-all",
             }}>
@@ -125,14 +125,14 @@ export function UploadProgress({
           </div>
 
           <div style={{ marginBottom: 16 }}>
-            <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 4 }}>Base URI</div>
+            <div style={{ color: "#606068", fontSize: 12, marginBottom: 4 }}>Base URI</div>
             <code style={{
-              color: "#5b7def",
+              color: "#a0a0aa",
               fontSize: 13,
               fontFamily: "'JetBrains Mono', monospace",
-              background: "#1a1a2e",
+              background: "#1c1c20",
               padding: "8px 12px",
-              borderRadius: 6,
+              borderRadius: 0,
               display: "block",
               wordBreak: "break-all",
             }}>
@@ -151,9 +151,9 @@ export function UploadProgress({
                   alignItems: "center",
                   gap: 8,
                   padding: "10px 20px",
-                  background: "linear-gradient(135deg, #5b7def, #8b5cf6)",
-                  color: "#fff",
-                  borderRadius: 8,
+                  background: "#ededf0",
+                  color: "#141416",
+                  borderRadius: 0,
                   fontSize: 14,
                   fontWeight: 600,
                   textDecoration: "none",
@@ -166,15 +166,15 @@ export function UploadProgress({
                 </svg>
                 Visit site
               </a>
-              <p style={{ color: "#6b7280", fontSize: 12, marginTop: 10, lineHeight: 1.5 }}>
+              <p style={{ color: "#606068", fontSize: 12, marginTop: 10, lineHeight: 1.5 }}>
                 Each deploy produces a new immutable manifest. To update, redeploy and update your DNS/ENS.
               </p>
             </div>
           ) : (
-            <div style={{ color: "#6b7280", fontSize: 13, marginBottom: 16 }}>
+            <div style={{ color: "#606068", fontSize: 13, marginBottom: 16 }}>
               <p style={{ margin: "0 0 4px" }}>File 0: {baseUri}0</p>
               <p style={{ margin: "0 0 4px" }}>File 1: {baseUri}1</p>
-              <p style={{ margin: 0, color: "#4b5563" }}>...</p>
+              <p style={{ margin: 0, color: "#606068" }}>...</p>
             </div>
           )}
 
@@ -182,26 +182,26 @@ export function UploadProgress({
             <div style={{
               padding: "12px 16px",
               background: "rgba(255, 255, 255, 0.02)",
-              borderRadius: 8,
-              border: "1px solid #1e1e2e",
+              borderRadius: 0,
+              border: "1px solid #222228",
               marginBottom: 16,
             }}>
-              <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 8 }}>Gas usage</div>
+              <div style={{ color: "#606068", fontSize: 12, marginBottom: 8 }}>Gas usage</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
                 <div>
-                  <div style={{ color: "#4b5563", fontSize: 11 }}>Estimated</div>
-                  <div style={{ color: "#d1d5db", fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}>
+                  <div style={{ color: "#606068", fontSize: 11 }}>Estimated</div>
+                  <div style={{ color: "#c2c2c8", fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}>
                     {estimatedGas.toLocaleString()}
                   </div>
                 </div>
                 <div>
-                  <div style={{ color: "#4b5563", fontSize: 11 }}>Actual</div>
-                  <div style={{ color: "#d1d5db", fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}>
+                  <div style={{ color: "#606068", fontSize: 11 }}>Actual</div>
+                  <div style={{ color: "#c2c2c8", fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}>
                     {Number(actualGasUsed).toLocaleString()}
                   </div>
                 </div>
                 <div>
-                  <div style={{ color: "#4b5563", fontSize: 11 }}>Accuracy</div>
+                  <div style={{ color: "#606068", fontSize: 11 }}>Accuracy</div>
                   <div style={{
                     fontSize: 13,
                     fontFamily: "'JetBrains Mono', monospace",
@@ -228,10 +228,10 @@ export function UploadProgress({
               style={{
                 marginTop: 4,
                 padding: "10px 20px",
-                background: "#1e1e2e",
-                color: "#d1d5db",
-                border: "1px solid #2a2a3a",
-                borderRadius: 8,
+                background: "#222228",
+                color: "#c2c2c8",
+                border: "1px solid #2a2a30",
+                borderRadius: 0,
                 fontSize: 13,
                 fontWeight: 500,
                 cursor: "pointer",

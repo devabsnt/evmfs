@@ -160,6 +160,16 @@ Names are ERC-721 NFTs — transferable and tradeable on any marketplace. The ga
 
 - **EVMFSNames contract** (mainnet): `0x36043906ba7c191c9511a60a8b28e3a602ed1477`
 
+### Custom Domains
+
+Point your own domain at an EVMFS Names site. Your domain can be registered anywhere - you just need a proxy layer (like Cloudflare's free tier) that rewrites the Host header to `yourname.evmfs.xyz`.
+
+1. CNAME your domain to `yourname.evmfs.xyz` (Cloudflare proxy ON)
+2. Add an Origin Rule to rewrite the Host header to `yourname.evmfs.xyz`
+3. Set SSL to Full (strict)
+
+Also works with Caddy, nginx, or any reverse proxy. Full guide in the Docs tab at [evmfs.xyz](https://evmfs.xyz).
+
 ### Security note on auto-signing
 
 The "private key (auto-sign)" option exists because clicking MetaMask 50 times for a 10k-file upload is not a product. **The key stays in browser memory only** — it is never sent to any server, never written to localStorage, never persisted anywhere. Refresh the page and it's gone. If you're uploading from a dedicated deployment wallet, this is the fastest path.

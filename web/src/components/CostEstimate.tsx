@@ -27,7 +27,7 @@ export function CostEstimate({
 
   return (
     <div style={{ padding: "24px 0" }}>
-      <h3 style={{ color: "#e0e0e0", fontSize: 15, fontWeight: 600, margin: "0 0 16px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+      <h3 style={{ color: "#ededf0", fontSize: 15, fontWeight: 600, margin: "0 0 16px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
         Upload Summary
       </h3>
 
@@ -48,29 +48,29 @@ export function CostEstimate({
       <div style={{
         marginTop: 20,
         padding: "16px 20px",
-        background: "rgba(91, 125, 239, 0.08)",
-        borderRadius: 8,
+        background: "rgba(160, 160, 170, 0.08)",
+        borderRadius: 0,
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <span style={{ color: "#9ca3af", fontSize: 13, fontWeight: 500 }}>Estimated cost</span>
+          <span style={{ color: "#78787e", fontSize: 13, fontWeight: 500 }}>Estimated cost</span>
           <div style={{ textAlign: "right" }}>
             {estimate.costEth ? (
               <>
-                <span style={{ color: "#e0e0e0", fontSize: 20, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" }}>
+                <span style={{ color: "#ededf0", fontSize: 20, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" }}>
                   {estimate.costEth} ETH
                 </span>
                 {estimate.costUsd && (
-                  <span style={{ color: "#9ca3af", fontSize: 14, marginLeft: 8 }}>
+                  <span style={{ color: "#78787e", fontSize: 14, marginLeft: 8 }}>
                     ({estimate.costUsd})
                   </span>
                 )}
               </>
             ) : (
-              <span style={{ color: "#6b7280", fontSize: 14 }}>Calculating...</span>
+              <span style={{ color: "#606068", fontSize: 14 }}>Calculating...</span>
             )}
           </div>
         </div>
-        <p style={{ color: "#6b7280", fontSize: 12, margin: "8px 0 0" }}>
+        <p style={{ color: "#606068", fontSize: 12, margin: "8px 0 0" }}>
           Based on live gas prices for the connected chain. Actual cost may vary.
         </p>
       </div>
@@ -89,23 +89,23 @@ export function CostEstimate({
             marginTop: 12,
             padding: "12px 16px",
             background: "rgba(255, 255, 255, 0.02)",
-            borderRadius: 8,
-            border: "1px solid #1e1e2e",
+            borderRadius: 0,
+            border: "1px solid #222228",
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <span style={{ color: "#6b7280", fontSize: 13 }}>Protocol fee</span>
+              <span style={{ color: "#606068", fontSize: 13 }}>Protocol fee</span>
               <div>
-                <span style={{ color: "#d1d5db", fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>
+                <span style={{ color: "#c2c2c8", fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>
                   {feeEth} ETH
                 </span>
                 {feeUsd && (
-                  <span style={{ color: "#6b7280", fontSize: 12, marginLeft: 6 }}>
+                  <span style={{ color: "#606068", fontSize: 12, marginLeft: 6 }}>
                     ({feeUsd})
                   </span>
                 )}
               </div>
             </div>
-            <p style={{ color: "#4b5563", fontSize: 11, margin: "6px 0 0" }}>
+            <p style={{ color: "#606068", fontSize: 11, margin: "6px 0 0" }}>
               Supports EVMFS development. The underlying contract is free to use directly.
             </p>
           </div>
@@ -118,8 +118,8 @@ export function CostEstimate({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 2 }}>{label}</div>
-      <div style={{ color: "#d1d5db", fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>{value}</div>
+      <div style={{ color: "#606068", fontSize: 12, marginBottom: 2 }}>{label}</div>
+      <div style={{ color: "#c2c2c8", fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>{value}</div>
     </div>
   );
 }

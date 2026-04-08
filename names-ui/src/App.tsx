@@ -140,7 +140,7 @@ export default function App() {
       });
       const [owner, blockNum, manifestHash] = result;
       if (owner === zeroAddress) {
-        setLookupError("Available — this name hasn't been claimed yet");
+        setLookupError("Available - this name hasn't been claimed yet");
       } else {
         setLookupResult({
           owner: owner as string,
@@ -192,7 +192,7 @@ export default function App() {
       <main style={s.main}>
         <h1 style={s.title}>Permanent subdomains on Ethereum</h1>
         <p style={s.sub}>
-          Claim <span style={s.hl}>yourname</span>.evmfs.xyz — backed by an on-chain registry, tradeable as an NFT.
+          Claim <span style={s.hl}>yourname</span>.evmfs.xyz - backed by an on-chain registry, tradeable as an NFT.
         </p>
 
         <div style={s.tabs}>
@@ -209,7 +209,7 @@ export default function App() {
               <h2 style={s.guideH}>What are EVMFS Names?</h2>
               <p style={s.guideP}>
                 EVMFS stores files permanently on Ethereum. When you deploy a static site
-                with <code style={s.code}>evmfs deploy</code>, you get a manifest hash — a
+                with <code style={s.code}>evmfs deploy</code>, you get a manifest hash - a
                 unique fingerprint for your entire site. EVMFS Names lets you point a human-readable
                 subdomain at that manifest.
               </p>
@@ -231,11 +231,12 @@ export default function App() {
             <div style={s.guideSection}>
               <h2 style={s.guideH}>Key details</h2>
               <div style={s.guideList}>
-                <div style={s.listItem}>Names are <strong>ERC-721 NFTs</strong> — transfer, sell, or trade on any marketplace</div>
+                <div style={s.listItem}>Names are <strong>ERC-721 NFTs</strong> - transfer, sell, or trade on any marketplace</div>
                 <div style={s.listItem}>Only the wallet that uploaded the manifest can register a name for it</div>
                 <div style={s.listItem}>Name owners can update their manifest to a new version at any time</div>
-                <div style={s.listItem}>The gateway resolves names on-chain — no databases, no middlemen</div>
+                <div style={s.listItem}>The gateway resolves names on-chain - no databases, no middlemen</div>
                 <div style={s.listItem}>Registration costs <strong>0.001 ETH</strong>, one-time, no renewals ever</div>
+                <div style={s.listItem}>Use your own domain via Cloudflare or any reverse proxy - <a href="https://evmfs.xyz" target="_blank" rel="noopener noreferrer" style={s.link}>full guide in docs</a></div>
               </div>
             </div>
             <div style={s.guideSection}>
@@ -310,7 +311,7 @@ export default function App() {
             )}
 
             {updateOwner !== null && updateOwner !== zeroAddress && !isUpdateOwner && (
-              <div style={s.status}><span style={{ color: "#d05050" }}>Owned by {updateOwner.slice(0, 10)}... — not your wallet</span></div>
+              <div style={s.status}><span style={{ color: "#d05050" }}>Owned by {updateOwner.slice(0, 10)}... - not your wallet</span></div>
             )}
 
             {isUpdateOwner && (
@@ -368,7 +369,7 @@ export default function App() {
       </main>
 
       <footer style={s.footer}>
-        <span style={s.dim}>evmfsnames — on-chain subdomain registry</span>
+        <span style={s.dim}>evmfsnames - on-chain subdomain registry</span>
         <span style={s.dim}> · </span>
         <a href="https://evmfs.xyz" target="_blank" rel="noopener noreferrer" style={s.link}>evmfs.xyz</a>
         <span style={s.dim}> · </span>

@@ -42,13 +42,13 @@ export function UploadHistory({ uploads, loading, onRename, onDelete }: UploadHi
   };
 
   if (loading) {
-    return <div style={{ color: "#6b7280", fontSize: 14, padding: "24px 0" }}>Loading history...</div>;
+    return <div style={{ color: "#606068", fontSize: 14, padding: "24px 0" }}>Loading history...</div>;
   }
 
   if (uploads.length === 0) {
     return (
       <div style={{ padding: "40px 0", textAlign: "center" }}>
-        <div style={{ color: "#4b5563", fontSize: 14 }}>No uploads yet</div>
+        <div style={{ color: "#606068", fontSize: 14 }}>No uploads yet</div>
         <div style={{ color: "#374151", fontSize: 13, marginTop: 4 }}>
           Completed uploads will appear here
         </div>
@@ -70,9 +70,9 @@ export function UploadHistory({ uploads, loading, onRename, onDelete }: UploadHi
           <div
             key={upload.id}
             style={{
-              background: "#13131f",
-              borderRadius: 10,
-              border: "1px solid #1e1e2e",
+              background: "#141416",
+              borderRadius: 0,
+              border: "1px solid #222228",
               overflow: "hidden",
             }}
           >
@@ -89,7 +89,7 @@ export function UploadHistory({ uploads, loading, onRename, onDelete }: UploadHi
               <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
                 <svg
                   width="14" height="14" viewBox="0 0 24 24" fill="none"
-                  stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  stroke="#606068" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                   style={{ transform: isExpanded ? "rotate(90deg)" : "none", transition: "transform 0.15s", flexShrink: 0 }}
                 >
                   <polyline points="9 18 15 12 9 6" />
@@ -112,10 +112,10 @@ export function UploadHistory({ uploads, loading, onRename, onDelete }: UploadHi
                     }}
                     onClick={(e) => e.stopPropagation()}
                     style={{
-                      background: "#1a1a2e",
-                      border: "1px solid #5b7def",
-                      borderRadius: 4,
-                      color: "#e0e0e0",
+                      background: "#1c1c20",
+                      border: "1px solid #a0a0aa",
+                      borderRadius: 0,
+                      color: "#ededf0",
                       fontSize: 14,
                       fontWeight: 500,
                       padding: "2px 8px",
@@ -132,7 +132,7 @@ export function UploadHistory({ uploads, loading, onRename, onDelete }: UploadHi
                       setEditValue(upload.label);
                     }}
                     style={{
-                      color: "#e0e0e0",
+                      color: "#ededf0",
                       fontSize: 14,
                       fontWeight: 500,
                       overflow: "hidden",
@@ -146,32 +146,32 @@ export function UploadHistory({ uploads, loading, onRename, onDelete }: UploadHi
                 )}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, marginLeft: 12 }}>
-                <span style={{ color: "#6b7280", fontSize: 12 }}>{upload.fileCount} files</span>
+                <span style={{ color: "#606068", fontSize: 12 }}>{upload.fileCount} files</span>
                 <span style={{
-                  color: "#4b5563",
+                  color: "#606068",
                   fontSize: 11,
-                  background: "#1a1a2e",
+                  background: "#1c1c20",
                   padding: "2px 8px",
-                  borderRadius: 4,
+                  borderRadius: 0,
                 }}>
                   {chainName}
                 </span>
-                <span style={{ color: "#4b5563", fontSize: 12 }}>{dateStr}</span>
+                <span style={{ color: "#606068", fontSize: 12 }}>{dateStr}</span>
               </div>
             </div>
 
             {isExpanded && (
-              <div style={{ borderTop: "1px solid #1e1e2e", padding: "16px" }}>
+              <div style={{ borderTop: "1px solid #222228", padding: "16px" }}>
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 4 }}>Base URI</div>
+                  <div style={{ color: "#606068", fontSize: 12, marginBottom: 4 }}>Base URI</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <code style={{
-                      color: "#5b7def",
+                      color: "#a0a0aa",
                       fontSize: 12,
                       fontFamily: "'JetBrains Mono', monospace",
-                      background: "#1a1a2e",
+                      background: "#1c1c20",
                       padding: "6px 10px",
-                      borderRadius: 6,
+                      borderRadius: 0,
                       flex: 1,
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -187,15 +187,15 @@ export function UploadHistory({ uploads, loading, onRename, onDelete }: UploadHi
                 </div>
 
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 4 }}>Manifest hash</div>
+                  <div style={{ color: "#606068", fontSize: 12, marginBottom: 4 }}>Manifest hash</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <code style={{
-                      color: "#d1d5db",
+                      color: "#c2c2c8",
                       fontSize: 12,
                       fontFamily: "'JetBrains Mono', monospace",
-                      background: "#1a1a2e",
+                      background: "#1c1c20",
                       padding: "6px 10px",
-                      borderRadius: 6,
+                      borderRadius: 0,
                       flex: 1,
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -212,19 +212,19 @@ export function UploadHistory({ uploads, loading, onRename, onDelete }: UploadHi
 
                 <div style={{
                   display: "flex", gap: 16, marginBottom: 16,
-                  color: "#4b5563", fontSize: 12,
+                  color: "#606068", fontSize: 12,
                 }}>
                   <span>{timeStr}</span>
                   <span>{Number(upload.totalGasUsed).toLocaleString()} gas</span>
                 </div>
 
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 6 }}>
+                  <div style={{ color: "#606068", fontSize: 12, marginBottom: 6 }}>
                     Files ({upload.fileCount})
                   </div>
                   <div style={{
-                    background: "#1a1a2e",
-                    borderRadius: 6,
+                    background: "#1c1c20",
+                    borderRadius: 0,
                     maxHeight: 240,
                     overflow: "auto",
                   }}>
@@ -236,16 +236,16 @@ export function UploadHistory({ uploads, loading, onRename, onDelete }: UploadHi
                           justifyContent: "space-between",
                           alignItems: "center",
                           padding: "6px 10px",
-                          borderBottom: "1px solid #1e1e2e",
+                          borderBottom: "1px solid #222228",
                           fontSize: 12,
                           fontFamily: "'JetBrains Mono', monospace",
                         }}
                       >
-                        <span style={{ color: "#9ca3af" }}>{f.filename}</span>
+                        <span style={{ color: "#78787e" }}>{f.filename}</span>
                         <span
                           onClick={() => copyToClipboard(f.contentHash, `file-${upload.id}-${f.index}`)}
                           style={{
-                            color: copiedField === `file-${upload.id}-${f.index}` ? "#22c55e" : "#4b5563",
+                            color: copiedField === `file-${upload.id}-${f.index}` ? "#22c55e" : "#606068",
                             cursor: "pointer",
                           }}
                           title="Click to copy hash"
@@ -300,11 +300,11 @@ function CopyButton({ onClick, copied }: { onClick: () => void; copied: boolean 
       onClick={(e) => { e.stopPropagation(); onClick(); }}
       style={{
         background: "none",
-        border: "1px solid #2a2a3a",
-        borderRadius: 4,
+        border: "1px solid #2a2a30",
+        borderRadius: 0,
         padding: "4px 8px",
         cursor: "pointer",
-        color: copied ? "#22c55e" : "#6b7280",
+        color: copied ? "#22c55e" : "#606068",
         fontSize: 11,
         flexShrink: 0,
       }}
@@ -321,9 +321,9 @@ function ActionButton({ onClick, children, danger }: { onClick: () => void; chil
       style={{
         padding: "6px 14px",
         background: "transparent",
-        color: danger ? "#ef4444" : "#9ca3af",
-        border: `1px solid ${danger ? "rgba(239, 68, 68, 0.3)" : "#2a2a3a"}`,
-        borderRadius: 6,
+        color: danger ? "#ef4444" : "#78787e",
+        border: `1px solid ${danger ? "rgba(239, 68, 68, 0.3)" : "#2a2a30"}`,
+        borderRadius: 0,
         fontSize: 12,
         cursor: "pointer",
       }}
