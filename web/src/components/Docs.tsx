@@ -383,10 +383,7 @@ GATEWAY_DOMAIN=yourdomain.com
         proxy_ssl_server_name on;
     }
 }`}</CodeBlock>
-        <p style={{ margin: "12px 0 0" }}>
-          When you redeploy and run <Code>evmfs update-name</Code>, your custom domain picks up the change automatically - the proxy config never needs to change.
-        </p>
-        <p style={{ margin: "10px 0 0", color: "#606068", fontSize: 13 }}>
+        <p style={{ margin: "12px 0 0", color: "#606068", fontSize: 13 }}>
           <strong style={{ color: "#c2c2c8" }}>Security note:</strong> with this setup, content is only as trustworthy as the gateway. For high-security use cases, run your own gateway and point your proxy at it instead of evmfs.xyz.
         </p>
       </Section>
