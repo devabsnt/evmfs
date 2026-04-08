@@ -2,15 +2,52 @@ import { useState } from "react";
 
 type DocsTab = "users" | "devs";
 
+const userSections = [
+  "What is EVMFS?",
+  "How is this different from IPFS?",
+  "What happens if evmfs.xyz disappears?",
+  "Can anyone delete my files?",
+  "What's a content hash?",
+  "What does a file URL look like?",
+  "How do I verify my files are on-chain?",
+  "How do I access files without this site?",
+  "Static site hosting",
+  "EVMFS Names",
+];
+
+const devSections = [
+  "Contract address",
+  "URL format",
+  "Manifest format",
+  "Large files (multi-part entries)",
+  "Contract ABI",
+  "Direct RPC fetch (no gateway required)",
+  "Self-host the gateway",
+  "EVMFS Names contract",
+  "npm packages",
+  "Run your own gateway",
+  "Custom domains",
+  "Source code",
+];
+
+function slugify(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
 export function Docs() {
   const [section, setSection] = useState<DocsTab>("users");
+  const titles = section === "users" ? userSections : devSections;
+
+  const scrollTo = (title: string) => {
+    const el = document.getElementById(slugify(title));
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
     <div style={{ padding: "8px 0" }}>
       <div style={{
         display: "flex",
         gap: 0,
-        borderRadius: 0,
         overflow: "hidden",
         border: "1px solid #2a2a30",
         marginBottom: 24,
@@ -20,7 +57,55 @@ export function Docs() {
         <SubTab label="For Developers" active={section === "devs"} onClick={() => setSection("devs")} />
       </div>
 
-      {section === "users" ? <UsersDocs /> : <DevsDocs />}
+      <div style={{ display: "flex", gap: 24 }}>
+        <nav style={{
+          width: 180,
+          flexShrink: 0,
+          position: "sticky",
+          top: 16,
+          alignSelf: "flex-start",
+          maxHeight: "calc(100vh - 32px)",
+          overflowY: "auto",
+        }}>
+          {titles.map((title) => (
+            <button
+              key={title}
+              onClick={() => scrollTo(title)}
+              style={{
+                display: "block",
+                width: "100%",
+                textAlign: "left",
+                padding: "5px 10px",
+                background: "none",
+                border: "none",
+                borderLeft: "1px solid #222228",
+                color: "#606068",
+                fontSize: 12,
+                fontFamily: "'JetBrains Mono', monospace",
+                cursor: "pointer",
+                lineHeight: 1.5,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = "#ededf0";
+                e.currentTarget.style.borderLeftColor = "#606068";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = "#606068";
+                e.currentTarget.style.borderLeftColor = "#222228";
+              }}
+            >
+              {title}
+            </button>
+          ))}
+        </nav>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {section === "users" ? <UsersDocs /> : <DevsDocs />}
+        </div>
+      </div>
     </div>
   );
 }
@@ -48,7 +133,7 @@ function SubTab({ label, active, onClick }: { label: string; active: boolean; on
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 28 }}>
+    <div id={slugify(title)} style={{ marginBottom: 28, scrollMarginTop: 16 }}>
       <h3 style={{
         color: "#ededf0",
         fontSize: 14,
