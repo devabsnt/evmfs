@@ -12,7 +12,7 @@ import { useFileProcessor } from "./hooks/useFileProcessor";
 import { useUploadHistory } from "./hooks/useUploadHistory";
 import { uploadFiles, uploadFilesWithPrivateKey, type UploadCallbacks, loadProgress, clearProgress, progressMatchesFiles, type SavedProgress, type ManifestOutputEntry, getDisplayHash } from "./lib/evmfs";
 import { calculateFee, FEE_RECIPIENT } from "./lib/fee";
-import { EVMFS_CONTRACT, DEFAULT_RPC_URLS } from "./lib/wagmi";
+import { EVMFS_CONTRACT, DEFAULT_RPC_URLS, chainNameFor } from "./lib/wagmi";
 import type { SavedUpload } from "./lib/history";
 
 type UploadMode = "wallet" | "privatekey";
@@ -302,7 +302,7 @@ export default function App() {
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
             </button>
-            <ConnectButton showBalance={false} chainStatus="icon" accountStatus="address" />
+            <ConnectButton showBalance={false} chainStatus="full" accountStatus="address" />
           </div>
         </div>
       </header>
@@ -348,7 +348,7 @@ export default function App() {
             Upload files to the blockchain
           </h1>
           <p style={{ color: "#606068", fontSize: 15, margin: 0, lineHeight: 1.6 }}>
-            Files are stored permanently in Ethereum event logs.
+            Files are stored permanently in {chainNameFor(chainId)} event logs.
             Pay once, stored forever. A drop-in replacement for IPFS.
           </p>
         </div>
@@ -422,7 +422,7 @@ export default function App() {
           />
         )}
 
-        {tab === "docs" && <Docs />}
+        {tab === "docs" && <Docs chainId={chainId} />}
 
         {tab === "upload" && <>
         <div style={{
@@ -435,7 +435,7 @@ export default function App() {
           color: "#78787e",
           lineHeight: 1.5,
         }}>
-          Your files are stored on Ethereum, not on this site.{" "}
+          Your files are stored on {chainNameFor(chainId)}, not on this site.{" "}
           <button
             onClick={() => setTab("docs")}
             style={{

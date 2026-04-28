@@ -8,3 +8,16 @@ rpc_urls:
     - "https://ethereum-rpc.publicnode.com"
   "11155111":
     - "https://ethereum-sepolia-rpc.publicnode.com"
+  "143":
+    - "https://rpc1.monad.xyz"
+    - "https://rpc.monad.xyz"
+    - "https://rpc-mainnet.monadinfra.com"
+    - "https://rpc3.monad.xyz"
+    - "https://rpc2.monad.xyz"
+    - "https://rpc4.monad.xyz"
+    - "https://monad-mainnet.api.onfinality.io/public"
+    - "https://monad-mainnet.drpc.org"
+    - "https://monad-rpc.huginn.tech"
+    - "https://monad-mainnet-rpc.spidernode.net"
+    - "https://gm.monad.at.htw.tech"
+    - "https://rpc.sentio.xyz/monad-mainnet"

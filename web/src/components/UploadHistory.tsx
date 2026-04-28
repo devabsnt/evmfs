@@ -4,6 +4,7 @@ import type { SavedUpload } from "../lib/history";
 const CHAIN_NAMES: Record<number, string> = {
   1: "Ethereum",
   11155111: "Sepolia",
+  143: "Monad",
 };
 
 interface UploadHistoryProps {

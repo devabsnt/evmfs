@@ -1,9 +1,16 @@
-export async function fetchEthPrice(): Promise<number> {
+import { COINGECKO_ID, NATIVE_CURRENCY } from "./wagmi";
+
+export async function fetchNativePrice(chainId: number): Promise<number> {
+  const id = COINGECKO_ID[chainId] ?? "ethereum";
   const res = await fetch(
-    "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
+    `https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd`
   );
   const data = await res.json();
-  return data.ethereum.usd;
+  return data[id]?.usd ?? 0;
+}
+
+export async function fetchEthPrice(): Promise<number> {
+  return fetchNativePrice(1);
 }
 
 export function formatUsd(amount: number): string {
@@ -15,10 +22,15 @@ export function formatUsd(amount: number): string {
   }).format(amount);
 }
 
+export function formatNative(wei: bigint, chainId: number): string {
+  const symbol = NATIVE_CURRENCY[chainId] ?? "ETH";
+  const value = Number(wei) / 1e18;
+  if (value < 0.0001) return `< 0.0001 ${symbol}`;
+  return `${value.toFixed(4)} ${symbol}`;
+}
+
 export function formatEth(wei: bigint): string {
-  const eth = Number(wei) / 1e18;
-  if (eth < 0.0001) return "< 0.0001 ETH";
-  return `${eth.toFixed(4)} ETH`;
+  return formatNative(wei, 1);
 }
 
 export function formatGwei(wei: bigint): string {

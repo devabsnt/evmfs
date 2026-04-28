@@ -46,7 +46,22 @@ type logEntry struct {
 	Data   string   `json:"data"`
 }
 
-const maxBlockRange int64 = 50000
+var maxBlockRangeByChain = map[string]int64{
+	"1":        50000,
+	"11155111": 50000,
+	"143":      100,
+}
+
+const defaultMaxBlockRange int64 = 50000
+
+const fallbackScanWindowCap = 200
+
+func maxBlockRangeFor(chainId string) int64 {
+	if v, ok := maxBlockRangeByChain[chainId]; ok {
+		return v
+	}
+	return defaultMaxBlockRange
+}
 
 func getBlockNumber(rpcURL string) (int64, error) {
 	req := jsonRPCRequest{
@@ -94,14 +109,14 @@ func getBlockNumber(rpcURL string) (int64, error) {
 	return blockNum.Int64(), nil
 }
 
-func FetchContent(rpcURLs []string, contractAddress string, contentHash string, blockHint int64) ([]byte, error) {
+func FetchContent(rpcURLs []string, contractAddress, chainId, contentHash string, blockHint int64) ([]byte, error) {
 	if len(rpcURLs) == 0 {
 		return nil, fmt.Errorf("no RPC URLs configured")
 	}
 
 	var lastErr error
 	for _, rpcURL := range rpcURLs {
-		data, err := fetchFromRPC(rpcURL, contractAddress, contentHash, blockHint)
+		data, err := fetchFromRPC(rpcURL, contractAddress, chainId, contentHash, blockHint)
 		if err != nil {
 			lastErr = err
 			continue
@@ -112,7 +127,7 @@ func FetchContent(rpcURLs []string, contractAddress string, contentHash string, 
 	return nil, fmt.Errorf("all RPC URLs failed, last error: %w", lastErr)
 }
 
-func fetchFromRPC(rpcURL, contractAddress, contentHash string, blockHint int64) ([]byte, error) {
+func fetchFromRPC(rpcURL, contractAddress, chainId, contentHash string, blockHint int64) ([]byte, error) {
 	if blockHint > 0 {
 		from := blockHint - 1
 		if from < 0 {
@@ -134,8 +149,11 @@ func fetchFromRPC(rpcURL, contractAddress, contentHash string, blockHint int64) 
 		return nil, fmt.Errorf("failed to get latest block: %w", err)
 	}
 
+	rangeSize := maxBlockRangeFor(chainId)
+
+	windows := 0
 	for toBlock := latestBlock; toBlock >= 0; {
-		fromBlock := toBlock - maxBlockRange + 1
+		fromBlock := toBlock - rangeSize + 1
 		if fromBlock < 0 {
 			fromBlock = 0
 		}
@@ -152,6 +170,11 @@ func fetchFromRPC(rpcURL, contractAddress, contentHash string, blockHint int64) 
 			break
 		}
 		toBlock = fromBlock - 1
+
+		windows++
+		if windows >= fallbackScanWindowCap {
+			return nil, fmt.Errorf("fallback scan exceeded %d windows on chain %s for %s; aborting to avoid RPC abuse", fallbackScanWindowCap, chainId, contentHash)
+		}
 	}
 
 	return nil, fmt.Errorf("no logs found for content hash %s", contentHash)

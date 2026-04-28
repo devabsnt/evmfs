@@ -437,7 +437,7 @@ func (s *Server) fetchRawChunk(chainId, contentHash string, blockHint int64) ([]
 		return nil, fmt.Errorf("no RPC URLs configured for chain %s", chainId)
 	}
 
-	raw, err := FetchContent(rpcURLs, s.Config.ContractAddress, contentHash, blockHint)
+	raw, err := FetchContent(rpcURLs, s.Config.ContractAddress, chainId, contentHash, blockHint)
 	if err != nil {
 		return nil, err
 	}
@@ -502,7 +502,7 @@ func (s *Server) fetchAndDecompress(chainId, contentHash string, blockHint int64
 		return nil, fmt.Errorf("no RPC URLs configured for chain %s", chainId)
 	}
 
-	raw, err := FetchContent(rpcURLs, s.Config.ContractAddress, contentHash, blockHint)
+	raw, err := FetchContent(rpcURLs, s.Config.ContractAddress, chainId, contentHash, blockHint)
 	if err != nil {
 		return nil, err
 	}

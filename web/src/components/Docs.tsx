@@ -1,6 +1,11 @@
 import { useState } from "react";
+import { chainNameFor } from "../lib/wagmi";
 
 type DocsTab = "users" | "devs";
+
+interface DocsProps {
+  chainId?: number;
+}
 
 const userSections = [
   "What is EVMFS?",
@@ -34,8 +39,9 @@ function slugify(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-export function Docs() {
+export function Docs({ chainId }: DocsProps) {
   const [section, setSection] = useState<DocsTab>("users");
+  const chainName = chainNameFor(chainId);
   const titles = section === "users" ? userSections : devSections;
 
   const scrollTo = (title: string) => {
@@ -103,7 +109,7 @@ export function Docs() {
         </nav>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          {section === "users" ? <UsersDocs /> : <DevsDocs />}
+          {section === "users" ? <UsersDocs chainName={chainName} /> : <DevsDocs chainName={chainName} />}
         </div>
       </div>
     </div>
@@ -185,15 +191,15 @@ function CodeBlock({ children }: { children: string }) {
   );
 }
 
-function UsersDocs() {
+function UsersDocs({ chainName }: { chainName: string }) {
   return (
     <div>
       <Section title="What is EVMFS?">
-        EVMFS stores your files permanently inside Ethereum event logs. You pay gas once at upload and the files stay retrievable forever - no subscription, no pinning service, no ongoing fees.
+        EVMFS stores your files permanently inside {chainName} event logs. You pay gas once at upload and the files stay retrievable forever - no subscription, no pinning service, no ongoing fees.
       </Section>
 
       <Section title="How is this different from IPFS?">
-        IPFS relies on voluntary pinners to keep files online - if nobody pins your file, it disappears. EVMFS stores file bytes directly in Ethereum's event logs, backed by the same consensus that secures the chain itself. There are no pinners to keep paying, and no dependency on any specific service staying online.
+        IPFS relies on voluntary pinners to keep files online - if nobody pins your file, it disappears. EVMFS stores file bytes directly in {chainName}'s event logs, backed by the same consensus that secures the chain itself. There are no pinners to keep paying, and no dependency on any specific service staying online.
       </Section>
 
       <Section title="What happens if evmfs.xyz disappears?">
@@ -201,7 +207,7 @@ function UsersDocs() {
         <ul style={{ margin: "10px 0 0", paddingLeft: 20 }}>
           <li>Point your app at any other EVMFS gateway</li>
           <li>Run your own gateway (Docker, 30 seconds)</li>
-          <li>Fetch directly from any Ethereum RPC via <Code>eth_getLogs</Code></li>
+          <li>Fetch directly from any {chainName} RPC via <Code>eth_getLogs</Code></li>
           <li>Read events via Etherscan's free API</li>
         </ul>
         <p style={{ margin: "12px 0 0" }}>
@@ -210,7 +216,7 @@ function UsersDocs() {
       </Section>
 
       <Section title="Can anyone delete my files?">
-        No. The EVMFS contract has no admin, no owner, no delete function, and no upgrade mechanism. Once your files are written to Ethereum's event logs, they're as permanent as the chain itself.
+        No. The EVMFS contract has no admin, no owner, no delete function, and no upgrade mechanism. Once your files are written to {chainName}'s event logs, they're as permanent as the chain itself.
       </Section>
 
       <Section title="What's a content hash?">
@@ -220,7 +226,7 @@ function UsersDocs() {
       <Section title="What does a file URL look like?">
         <CodeBlock>{`https://evmfs.xyz/1/19280143/0xabc.../0`}</CodeBlock>
         <ul style={{ margin: "10px 0 0", paddingLeft: 20 }}>
-          <li><Code>1</Code> - chain ID (Ethereum mainnet)</li>
+          <li><Code>1</Code> - chain ID (Ethereum mainnet; <Code>143</Code> = Monad mainnet)</li>
           <li><Code>19280143</Code> - block where the manifest was stored</li>
           <li><Code>0xabc...</Code> - your manifest hash</li>
           <li><Code>0</Code> - file index within your manifest</li>
@@ -232,11 +238,11 @@ function UsersDocs() {
       </Section>
 
       <Section title="How do I access files without this site?">
-        You need four values: contract address, chain ID, manifest hash, and manifest block number. Save them in your project README or NFT contract comments. With those, any developer can reconstruct access in ~50 lines of JavaScript against any Ethereum RPC. Full instructions are in the <strong style={{ color: "#c2c2c8" }}>For Developers</strong> tab.
+        You need four values: contract address, chain ID, manifest hash, and manifest block number. Save them in your project README or NFT contract comments. With those, any developer can reconstruct access in ~50 lines of JavaScript against any {chainName} RPC. Full instructions are in the <strong style={{ color: "#c2c2c8" }}>For Developers</strong> tab.
       </Section>
 
       <Section title="Static site hosting">
-        EVMFS can host entire websites on Ethereum. Switch to <strong style={{ color: "#c2c2c8" }}>Deploy folder</strong> mode, drop your site's build folder, and upload. The gateway serves files by their original path with correct content types:
+        EVMFS can host entire websites on {chainName}. Switch to <strong style={{ color: "#c2c2c8" }}>Deploy folder</strong> mode, drop your site's build folder, and upload. The gateway serves files by their original path with correct content types:
         <CodeBlock>{`https://evmfs.xyz/1/24826863/0xabc.../index.html
 https://evmfs.xyz/1/24826863/0xabc.../assets/style.css`}</CodeBlock>
         <p style={{ margin: "12px 0 0" }}>
@@ -260,13 +266,13 @@ https://evmfs.xyz/1/24826863/0xabc.../assets/style.css`}</CodeBlock>
   );
 }
 
-function DevsDocs() {
+function DevsDocs({ chainName }: { chainName: string }) {
   return (
     <div>
       <Section title="Contract address">
         <CodeBlock>{`0x140cbDFf649929D003091a5B8B3be34588753aBA`}</CodeBlock>
         <p style={{ margin: "10px 0 0" }}>
-          Deployed on Ethereum mainnet (chain ID <Code>1</Code>). Immutable, no admin, no upgrades.
+          Deployed on Ethereum mainnet (chain ID <Code>1</Code>) and Monad mainnet (chain ID <Code>143</Code>) at the same address via CREATE2. Immutable, no admin, no upgrades.
         </p>
       </Section>
 
@@ -343,7 +349,7 @@ const bytes = ethers.getBytes(raw);
 
 docker run -p 8080:8080 \\
   -e CONTRACT_ADDRESS=0x140cbDFf649929D003091a5B8B3be34588753aBA \\
-  -e RPC_URLS="1=https://eth.llamarpc.com" \\
+  -e RPC_URLS="1=https://eth.llamarpc.com;143=https://rpc.monad.xyz" \\
   evmfs-gateway`}</CodeBlock>
       </Section>
 
@@ -395,7 +401,7 @@ const entries = await fs.manifest(hash, block);`}</CodeBlock>
 
       <Section title="Run your own gateway">
         <p style={{ margin: "0 0 10px" }}>
-          The gateway at evmfs.xyz is a convenience - not a dependency. Anyone can run their own. The gateway is a stateless Go binary that reads from any Ethereum RPC and caches to disk.
+          The gateway at evmfs.xyz is a convenience - not a dependency. Anyone can run their own. The gateway is a stateless Go binary that reads from any {chainName} RPC and caches to disk.
         </p>
         <CodeBlock>{`# Clone and build
 git clone https://github.com/devabsnt/evmfs
@@ -404,17 +410,17 @@ go build -o evmfs-gateway .
 
 # Run
 CONTRACT_ADDRESS=0x140cbDFf649929D003091a5B8B3be34588753aBA \\
-RPC_URLS="1=https://eth.llamarpc.com" \\
+RPC_URLS="1=https://eth.llamarpc.com;143=https://rpc.monad.xyz" \\
 ./evmfs-gateway
 
 # Or with Docker
 docker build -t evmfs-gateway .
 docker run -p 8080:8080 \\
   -e CONTRACT_ADDRESS=0x140cbDFf649929D003091a5B8B3be34588753aBA \\
-  -e RPC_URLS="1=https://eth.llamarpc.com" \\
+  -e RPC_URLS="1=https://eth.llamarpc.com;143=https://rpc.monad.xyz" \\
   evmfs-gateway`}</CodeBlock>
         <p style={{ margin: "12px 0 0" }}>
-          Your gateway serves the same URLs. Multiple gateways can coexist - the data is on Ethereum, not on any particular server. If evmfs.xyz goes down, point your URLs at your own gateway and everything keeps working.
+          Your gateway serves the same URLs. Multiple gateways can coexist - the data is on {chainName}, not on any particular server. If evmfs.xyz goes down, point your URLs at your own gateway and everything keeps working.
         </p>
         <p style={{ margin: "10px 0 0" }}>
           To enable subdomain resolution, add these env vars and a wildcard DNS record:

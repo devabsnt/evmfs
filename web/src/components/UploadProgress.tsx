@@ -172,9 +172,18 @@ export function UploadProgress({
             </div>
           ) : (
             <div style={{ color: "#606068", fontSize: 13, marginBottom: 16 }}>
-              <p style={{ margin: "0 0 4px" }}>File 0: {baseUri}0</p>
-              <p style={{ margin: "0 0 4px" }}>File 1: {baseUri}1</p>
-              <p style={{ margin: 0, color: "#606068" }}>...</p>
+              {totalFiles <= 3 ? (
+                Array.from({ length: totalFiles }, (_, i) => (
+                  <p key={i} style={{ margin: "0 0 4px" }}>File {i}: {baseUri}{i}</p>
+                ))
+              ) : (
+                <>
+                  <p style={{ margin: "0 0 4px" }}>File 0: {baseUri}0</p>
+                  <p style={{ margin: "0 0 4px" }}>File 1: {baseUri}1</p>
+                  <p style={{ margin: "0 0 4px", color: "#606068" }}>...</p>
+                  <p style={{ margin: 0 }}>File {totalFiles - 1}: {baseUri}{totalFiles - 1}</p>
+                </>
+              )}
             </div>
           )}
 
@@ -258,6 +267,7 @@ function getTxExplorerUrl(chainId: number, txHash: string): string {
   const explorers: Record<number, string> = {
     1: "https://etherscan.io/tx/",
     11155111: "https://sepolia.etherscan.io/tx/",
+    143: "https://monadscan.com/tx/",
   };
   const base = explorers[chainId] || `https://etherscan.io/tx/`;
   return `${base}${txHash}`;

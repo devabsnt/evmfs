@@ -1,6 +1,7 @@
 import { useGasEstimate } from "../hooks/useGasEstimate";
 import { formatGwei } from "../lib/prices";
 import { calculateFee, formatFeeEth } from "../lib/fee";
+import { NATIVE_CURRENCY } from "../lib/wagmi";
 
 interface CostEstimateProps {
   totalGas: number;
@@ -24,6 +25,7 @@ export function CostEstimate({
   chainId,
 }: CostEstimateProps) {
   const estimate = useGasEstimate(totalGas, chainId);
+  const symbol = NATIVE_CURRENCY[chainId ?? 1] ?? "ETH";
 
   return (
     <div style={{ padding: "24px 0" }}>
@@ -41,7 +43,7 @@ export function CostEstimate({
           value={estimate.gasPriceWei ? formatGwei(estimate.gasPriceWei) : "Fetching..."}
         />
         {estimate.ethPrice && (
-          <Stat label="ETH price" value={`$${estimate.ethPrice.toLocaleString()}`} />
+          <Stat label={`${symbol} price`} value={`$${estimate.ethPrice.toLocaleString()}`} />
         )}
       </div>
 
@@ -57,7 +59,7 @@ export function CostEstimate({
             {estimate.costEth ? (
               <>
                 <span style={{ color: "#ededf0", fontSize: 20, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" }}>
-                  {estimate.costEth} ETH
+                  {estimate.costEth} {symbol}
                 </span>
                 {estimate.costUsd && (
                   <span style={{ color: "#78787e", fontSize: 14, marginLeft: 8 }}>
@@ -96,7 +98,7 @@ export function CostEstimate({
               <span style={{ color: "#606068", fontSize: 13 }}>Protocol fee</span>
               <div>
                 <span style={{ color: "#c2c2c8", fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>
-                  {feeEth} ETH
+                  {feeEth} {symbol}
                 </span>
                 {feeUsd && (
                   <span style={{ color: "#606068", fontSize: 12, marginLeft: 6 }}>
@@ -128,6 +130,7 @@ function chainName(chainId?: number): string {
   const names: Record<number, string> = {
     1: "Ethereum",
     11155111: "Sepolia",
+    143: "Monad",
   };
   return chainId ? names[chainId] || `Chain ${chainId}` : "Unknown";
 }

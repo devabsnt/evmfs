@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchEthPrice } from "../lib/prices";
+import { fetchNativePrice } from "../lib/prices";
 import { DEFAULT_RPC_URLS } from "../lib/wagmi";
 
 interface GasEstimate {
@@ -13,31 +13,19 @@ interface GasEstimate {
 }
 
 async function fetchGasPrice(chainId: number): Promise<bigint> {
-  const urls: string[] = [];
+  const url = DEFAULT_RPC_URLS[chainId];
+  if (!url) throw new Error(`No RPC URL configured for chain ${chainId}`);
 
-  if (DEFAULT_RPC_URLS[chainId]) {
-    urls.push(DEFAULT_RPC_URLS[chainId]);
-  }
-  urls.push("https://eth.llamarpc.com", "https://ethereum-rpc.publicnode.com");
-
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jsonrpc: "2.0", method: "eth_gasPrice", params: [], id: 1 }),
-      });
-      const data = await res.json();
-      if (data.result) {
-        const price = BigInt(data.result);
-        console.log(`[EVMFS] Gas price: ${Number(price) / 1e9} gwei (chain ${chainId}, from ${url})`);
-        return price;
-      }
-    } catch {
-      continue;
-    }
-  }
-  throw new Error("All RPC endpoints failed");
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", method: "eth_gasPrice", params: [], id: 1 }),
+  });
+  const data = await res.json();
+  if (!data.result) throw new Error(`eth_gasPrice failed on chain ${chainId}`);
+  const price = BigInt(data.result);
+  console.log(`[EVMFS] Gas price: ${Number(price) / 1e9} gwei (chain ${chainId})`);
+  return price;
 }
 
 export function useGasEstimate(totalGas: number, chainId?: number): GasEstimate {
@@ -46,18 +34,19 @@ export function useGasEstimate(totalGas: number, chainId?: number): GasEstimate 
   const [loading, setLoading] = useState(true);
 
   const loadPrices = useCallback(async () => {
+    const cid = chainId ?? 1;
     try {
       const [gas, eth] = await Promise.all([
-        fetchGasPrice(chainId ?? 1),
-        fetchEthPrice(),
+        fetchGasPrice(cid),
+        fetchNativePrice(cid),
       ]);
       setGasPriceWei(gas);
       setEthPrice(eth);
-      console.log(`[EVMFS] ETH price: $${eth}, Gas: ${Number(gas) / 1e9} gwei`);
+      console.log(`[EVMFS] Native price: $${eth}, Gas: ${Number(gas) / 1e9} gwei`);
     } catch (err) {
       console.error("[EVMFS] Price fetch error:", err);
-      try { setGasPriceWei(await fetchGasPrice(chainId ?? 1)); } catch {}
-      try { setEthPrice(await fetchEthPrice()); } catch {}
+      try { setGasPriceWei(await fetchGasPrice(cid)); } catch { /* empty */ }
+      try { setEthPrice(await fetchNativePrice(cid)); } catch { /* empty */ }
     } finally {
       setLoading(false);
     }
