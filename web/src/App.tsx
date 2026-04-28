@@ -66,8 +66,11 @@ export default function App() {
     (files: FileWithPath[]) => {
       reset();
       if (deployMode === "site") {
-        // Build path map after processing — indices match sorted order
-        const sorted = [...files].sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+        // Build path map after processing — indices match sorted order.
+        // Must use { numeric: true } to match useFileProcessor's sort, otherwise
+        // filename labels and uploaded content end up at mismatched indices
+        // (e.g. lex puts "10.png" at index 1, numeric puts "2.png" at index 1).
+        const sorted = [...files].sort((a, b) => a.relativePath.localeCompare(b.relativePath, undefined, { numeric: true }));
         const pathMap = new Map<number, string>();
         sorted.forEach((f, i) => pathMap.set(i, f.relativePath));
         setFileRelPaths(pathMap);
