@@ -156,6 +156,28 @@ func findByFilename(entries []manifestEntry, path string) int {
 	return -1
 }
 
+// findByFilenameStem matches against the file's basename without extension.
+// E.g. stem="1" matches a manifest entry with F="1.png" or F="1.gif".
+// Returns the first match in array order; -1 if none.
+func findByFilenameStem(entries []manifestEntry, stem string) int {
+	if stem == "" {
+		return -1
+	}
+	for i, e := range entries {
+		if e.F == "" {
+			continue
+		}
+		ext := filepath.Ext(e.F)
+		if ext == "" {
+			continue
+		}
+		if strings.TrimSuffix(e.F, ext) == stem {
+			return i
+		}
+	}
+	return -1
+}
+
 func parseManifest(data []byte) ([]manifestEntry, error) {
 	var entries []manifestEntry
 	if err := json.Unmarshal(data, &entries); err == nil && len(entries) > 0 {
@@ -196,24 +218,31 @@ func (s *Server) handleManifestOrFile(w http.ResponseWriter, r *http.Request, ch
 		return
 	}
 
-	// Resolve pathOrIndex to a manifest entry index
+	// Resolve pathOrIndex to a manifest entry index.
+	// Order:
+	//   1. Exact filename match (named manifests).
+	//   2. Filename-stem match for extensionless requests (e.g. "/1" → "1.png").
+	//      Lets metadata reference siblings without baking in extensions.
+	//   3. Numeric-index fallback (legacy / unnamed manifests). For named
+	//      manifests this is a last resort to preserve backward compatibility,
+	//      but step 2 typically catches the cases where step 3 used to silently
+	//      return the wrong file.
+	//   4. SPA fallback to index.html for extensionless / .html paths.
 	entryIdx := -1
 	named := hasFilenames(entries)
 
-	if tokenId, err := strconv.Atoi(pathOrIndex); err == nil {
-		if !named {
-			// Old-format manifest: numeric index is primary
-			entryIdx = tokenId
-		} else {
-			// New-format manifest: try filename first, fall back to index
-			entryIdx = findByFilename(entries, pathOrIndex)
-			if entryIdx < 0 {
-				entryIdx = tokenId
-			}
-		}
-	} else {
-		// Non-numeric path: match against f fields
+	if named {
 		entryIdx = findByFilename(entries, pathOrIndex)
+	}
+
+	if entryIdx < 0 && named && filepath.Ext(pathOrIndex) == "" {
+		entryIdx = findByFilenameStem(entries, pathOrIndex)
+	}
+
+	if entryIdx < 0 {
+		if tokenId, err := strconv.Atoi(pathOrIndex); err == nil {
+			entryIdx = tokenId
+		}
 	}
 
 	// SPA fallback: only when named manifest, path not found, and path has no
