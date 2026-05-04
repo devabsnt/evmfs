@@ -32,12 +32,49 @@ type nameCacheEntry struct {
 type NameCache struct {
 	mu      sync.Mutex
 	entries map[string]nameCacheEntry
+
+	flightMu sync.Mutex
+	flight   map[string]*inflightLookup
+}
+
+type inflightLookup struct {
+	wg   sync.WaitGroup
+	info *SiteInfo
+	err  error
 }
 
 func NewNameCache() *NameCache {
-	c := &NameCache{entries: make(map[string]nameCacheEntry)}
+	c := &NameCache{
+		entries: make(map[string]nameCacheEntry),
+		flight:  make(map[string]*inflightLookup),
+	}
 	go c.cleanupLoop()
 	return c
+}
+
+// do collapses concurrent lookups for the same name into a single fn() call.
+// Other callers wait for the first call to complete and receive the same result.
+func (c *NameCache) do(name string, fn func() (*SiteInfo, error)) (*SiteInfo, error) {
+	c.flightMu.Lock()
+	if inf, ok := c.flight[name]; ok {
+		c.flightMu.Unlock()
+		inf.wg.Wait()
+		return inf.info, inf.err
+	}
+	inf := &inflightLookup{}
+	inf.wg.Add(1)
+	c.flight[name] = inf
+	c.flightMu.Unlock()
+
+	defer func() {
+		c.flightMu.Lock()
+		delete(c.flight, name)
+		c.flightMu.Unlock()
+		inf.wg.Done()
+	}()
+
+	inf.info, inf.err = fn()
+	return inf.info, inf.err
 }
 
 func (c *NameCache) get(name string) (nameCacheEntry, bool) {
@@ -131,32 +168,46 @@ func (s *Server) lookupName(name string) (*SiteInfo, error) {
 
 	calldataHex := "0x" + hex.EncodeToString(calldata)
 
-	var lastErr error
-	for _, rpcURL := range rpcURLs {
-		result, err := ethCall(rpcURL, s.Config.NamesContract, calldataHex)
-		if err != nil {
-			lastErr = err
-			continue
+	doRPC := func() (*SiteInfo, error) {
+		// Re-check cache: a concurrent caller may have populated it while we waited.
+		if s.NameCache != nil {
+			if e, ok := s.NameCache.get(name); ok {
+				return e.info, e.err
+			}
 		}
 
-		info, err := decodeLookupResult(result)
-		if err != nil {
-			lastErr = err
-			continue
+		var lastErr error
+		for _, rpcURL := range rpcURLs {
+			result, err := ethCall(rpcURL, s.Config.NamesContract, calldataHex)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+
+			info, err := decodeLookupResult(result)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			if s.NameCache != nil {
+				s.NameCache.set(name, info, nil)
+			}
+			return info, nil
 		}
-		if s.NameCache != nil {
-			s.NameCache.set(name, info, nil)
+		if errors.Is(lastErr, ErrNameNotRegistered) {
+			err := fmt.Errorf("lookup failed: %w", lastErr)
+			if s.NameCache != nil {
+				s.NameCache.set(name, nil, err)
+			}
+			return nil, err
 		}
-		return info, nil
+		return nil, fmt.Errorf("lookup failed: %w", lastErr)
 	}
-	if errors.Is(lastErr, ErrNameNotRegistered) {
-		err := fmt.Errorf("lookup failed: %w", lastErr)
-		if s.NameCache != nil {
-			s.NameCache.set(name, nil, err)
-		}
-		return nil, err
+
+	if s.NameCache != nil {
+		return s.NameCache.do(name, doRPC)
 	}
-	return nil, fmt.Errorf("lookup failed: %w", lastErr)
+	return doRPC()
 }
 
 func ethCall(rpcURL, to, data string) (string, error) {
