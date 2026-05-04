@@ -22,14 +22,16 @@ var contentHashRegex = regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
 type Server struct {
 	Config    *Config
 	Cache     *Cache
+	NameCache *NameCache
 	staticFS  http.Handler
 	hasStatic bool
 }
 
 func NewServer(cfg *Config, cache *Cache) *Server {
 	s := &Server{
-		Config: cfg,
-		Cache:  cache,
+		Config:    cfg,
+		Cache:     cache,
+		NameCache: NewNameCache(),
 	}
 	if cfg.StaticDir != "" {
 		s.staticFS = http.FileServer(http.Dir(cfg.StaticDir))

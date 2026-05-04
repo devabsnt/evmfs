@@ -2,8 +2,11 @@ package main
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
+	"sync"
+	"time"
 
 	"golang.org/x/crypto/sha3"
 )
@@ -13,11 +16,91 @@ type SiteInfo struct {
 	ManifestHash string
 }
 
+var ErrNameNotRegistered = errors.New("name not registered")
+
+const (
+	nameCacheTTL     = 60 * time.Second
+	nameCacheMaxSize = 10000
+)
+
+type nameCacheEntry struct {
+	info      *SiteInfo
+	err       error
+	expiresAt time.Time
+}
+
+type NameCache struct {
+	mu      sync.Mutex
+	entries map[string]nameCacheEntry
+}
+
+func NewNameCache() *NameCache {
+	c := &NameCache{entries: make(map[string]nameCacheEntry)}
+	go c.cleanupLoop()
+	return c
+}
+
+func (c *NameCache) get(name string) (nameCacheEntry, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	e, ok := c.entries[name]
+	if !ok || time.Now().After(e.expiresAt) {
+		return nameCacheEntry{}, false
+	}
+	return e, true
+}
+
+func (c *NameCache) set(name string, info *SiteInfo, err error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.entries) >= nameCacheMaxSize {
+		// Drop expired entries; if still full, drop arbitrary ones.
+		now := time.Now()
+		for k, v := range c.entries {
+			if now.After(v.expiresAt) {
+				delete(c.entries, k)
+			}
+		}
+		for k := range c.entries {
+			if len(c.entries) < nameCacheMaxSize {
+				break
+			}
+			delete(c.entries, k)
+		}
+	}
+	c.entries[name] = nameCacheEntry{
+		info:      info,
+		err:       err,
+		expiresAt: time.Now().Add(nameCacheTTL),
+	}
+}
+
+func (c *NameCache) cleanupLoop() {
+	t := time.NewTicker(nameCacheTTL)
+	defer t.Stop()
+	for range t.C {
+		c.mu.Lock()
+		now := time.Now()
+		for k, v := range c.entries {
+			if now.After(v.expiresAt) {
+				delete(c.entries, k)
+			}
+		}
+		c.mu.Unlock()
+	}
+}
+
 // lookupName queries the EVMFSNames contract for a registered name.
 // Calls lookup(string) which returns (address owner, uint64 blockNumber, bytes32 manifestHash).
 func (s *Server) lookupName(name string) (*SiteInfo, error) {
 	if s.Config.NamesContract == "" || s.Config.NamesChainId == "" {
 		return nil, fmt.Errorf("names contract not configured")
+	}
+
+	if s.NameCache != nil {
+		if e, ok := s.NameCache.get(name); ok {
+			return e.info, e.err
+		}
 	}
 
 	rpcURLs, ok := s.Config.RPCURLs[s.Config.NamesChainId]
@@ -61,7 +144,17 @@ func (s *Server) lookupName(name string) (*SiteInfo, error) {
 			lastErr = err
 			continue
 		}
+		if s.NameCache != nil {
+			s.NameCache.set(name, info, nil)
+		}
 		return info, nil
+	}
+	if errors.Is(lastErr, ErrNameNotRegistered) {
+		err := fmt.Errorf("lookup failed: %w", lastErr)
+		if s.NameCache != nil {
+			s.NameCache.set(name, nil, err)
+		}
+		return nil, err
 	}
 	return nil, fmt.Errorf("lookup failed: %w", lastErr)
 }
@@ -118,7 +211,7 @@ func decodeLookupResult(hexData string) (*SiteInfo, error) {
 		}
 	}
 	if isZero {
-		return nil, fmt.Errorf("name not registered")
+		return nil, ErrNameNotRegistered
 	}
 
 	// Word 1: uint64 blockNumber (last 8 bytes)
