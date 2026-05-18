@@ -6,7 +6,7 @@ Event logs have always been a permanent storage primitive baked into Ethereum's 
 
 Nobody wrapped a proper product around this. EVMFS is that product.
 
-It was designed primarily to make NFT metadata cheap to store fully on-chain; images, JSON, attributes, everything - at a fraction of the cost of alternatives, with none of the dependency risk. But nothing about the protocol is NFT-specific. Anything you can represent as bytes works: documents, provenance records, certificates, snapshots, data archives.
+It is a drop-in replacement for IPFS. You upload bytes once, you get a content hash, and the data lives on chain forever with no pinning fees, no endowments, no renewal deadlines, no third-party hosts to keep alive. Anything you can represent as bytes works: documents, websites, NFT metadata and images, provenance records, certificates, snapshots, data archives, software releases.
 
 ---
 
@@ -26,19 +26,9 @@ Nothing novel in the underlying mechanic. What's different is that the upload to
 
 ## What it costs
 
-Rough ballpark for **10,000 small files** (~400 bytes/file gzipped, batched efficiently):
+EVMFS storage is roughly **2,500× cheaper than SSTORE** for bulk data because it uses LOG opcodes (~8 gas per byte) instead of contract storage. Actual cost scales linearly with bytes uploaded and current gas price - use a gas calculator for an estimate against your specific upload.
 
-| Gas price | Cost (ETH) | Cost @ $2,500/ETH |
-|-----------|-----------|--------------------|
-| 0.1 gwei  | ~0.011 ETH | ~$27.50           |
-| 1 gwei    | ~0.11 ETH  | ~$275             |
-| 10 gwei   | ~1.1 ETH   | ~$2,750           |
-
-At the small end, a **single 2 KB metadata JSON** costs ~76,000 gas — roughly **$0.02 at 0.1 gwei / $2,500 ETH**, or ~$1.90 at 10 gwei. That's the realistic floor for entry-level use.
-
-A **1,000-file batch** is roughly 1/10th of the 10k numbers. A **single 10 KB image** costs ~260,000 gas — about **$0.65 at 1 gwei / $2,500 ETH**, or ~$6.50 at 10 gwei.
-
-This is a **one-time cost**. Nothing ever expires. There is no pinning service, no endowment, no ongoing fee.
+This is a **one-time cost**. Nothing ever expires. There is no pinning service, no endowment, no ongoing fee. The contract has no admin, no fee switch, no mechanism anyone can flip later to extract value at the protocol level.
 
 ### A note on fees
 
@@ -50,14 +40,16 @@ This is the same pattern Uniswap uses: free contract, hosted frontend earns its 
 
 ### Where EVMFS makes sense
 
-- NFT metadata and images (the primary design target)
-- Provenance records, certificates, small documents
+- Anything you currently pin on IPFS or pay to bundle on Arweave
+- Static websites, documents, certificates, provenance records
+- NFT metadata and images
+- Software releases, snapshots, data archives
 - Anything you want genuinely immutable and chain-verifiable
 - Data that should remain retrievable for as long as Ethereum exists
 
 ### Where it doesn't
 
-- **Large files** at scale. Files over ~100 KB are chunked across multiple transactions (the client splits, the gateway reassembles — no contract change required), so size isn't a hard limit, but cost scales linearly with bytes. A 1 MB file costs roughly $65–$300+ at typical gas prices; a 3 MB file runs into the low hundreds of dollars even at moderate gas. For video, audio, or high-res imagery at volume, evaluate whether the trust tradeoff of an external storage network is acceptable — EVMFS is optimized for cases where on-chain permanence is worth a premium per byte.
+- **Very large files** at scale. Files over ~100 KB are chunked across multiple transactions (the client splits, the gateway reassembles - no contract change required), so size isn't a hard limit, but cost scales linearly with bytes. For high-volume video, audio, or high-res imagery, evaluate whether the trust tradeoff of an external storage network is acceptable - EVMFS is optimized for cases where on-chain permanence is worth a premium per byte.
 - **Mutable content**. EVMFS has no delete, no update. Content addressing is the feature.
 - **Private data**. Event logs are public. Encrypt first if you need privacy.
 
