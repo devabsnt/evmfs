@@ -93,6 +93,13 @@ func rewriteURLs(data []byte, contentType string, r *http.Request, fromHosts []s
 			{"//" + host, "//" + hostOnly},
 		}
 		for _, p := range patterns {
+			// Identity substitution (matches when the gateway is hosted at the
+			// canonical host itself, e.g. evmfs.xyz running its own gateway).
+			// Skip without marking the response as rewritten so the immutable
+			// cache header is preserved.
+			if p.from == p.to {
+				continue
+			}
 			if bytes.Contains(out, []byte(p.from)) {
 				out = bytes.ReplaceAll(out, []byte(p.from), []byte(p.to))
 				rewritten = true

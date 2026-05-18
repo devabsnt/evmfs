@@ -115,6 +115,43 @@ func TestRewriteURLs_MultipleHosts(t *testing.T) {
 	}
 }
 
+func TestRewriteURLs_NoOpWhenHostedOnCanonicalHost(t *testing.T) {
+	// When the gateway is hosted at evmfs.xyz itself, rewriting evmfs.xyz
+	// references would be an identity substitution. The rewriter must skip
+	// it and leave the response untouched (no X-EVMFS-Rewritten header, no
+	// shortened cache header).
+	r := httptest.NewRequest("GET", "https://evmfs.xyz/foo", nil)
+	r.Host = "evmfs.xyz"
+	r.Header.Set("X-Forwarded-Proto", "https")
+
+	in := []byte(`{"image":"https://evmfs.xyz/143/71117086/0x764b.../1.png"}`)
+	out, rw := rewriteURLs(in, "application/json", r, []string{"evmfs.xyz"})
+	if rw {
+		t.Errorf("expected rewritten=false on identity substitution; got true")
+	}
+	if string(out) != string(in) {
+		t.Errorf("body changed despite identity substitution:\n  got:  %s\n  want: %s", out, in)
+	}
+}
+
+func TestRewriteURLs_HttpToHttpsOnSameHostStillRewrites(t *testing.T) {
+	// Even hosted at evmfs.xyz, an http://evmfs.xyz reference should be
+	// upgraded to https://evmfs.xyz — that's a meaningful change.
+	r := httptest.NewRequest("GET", "https://evmfs.xyz/foo", nil)
+	r.Host = "evmfs.xyz"
+	r.Header.Set("X-Forwarded-Proto", "https")
+
+	in := []byte(`{"image":"http://evmfs.xyz/143/X/Y/1.png"}`)
+	want := `{"image":"https://evmfs.xyz/143/X/Y/1.png"}`
+	out, rw := rewriteURLs(in, "application/json", r, []string{"evmfs.xyz"})
+	if !rw {
+		t.Fatalf("expected scheme-upgrade rewrite to count as rewritten")
+	}
+	if string(out) != want {
+		t.Errorf("got %q want %q", out, want)
+	}
+}
+
 func TestRewriteURLs_NoMatchReturnsOriginal(t *testing.T) {
 	r := httptest.NewRequest("GET", "https://newgateway.com/foo", nil)
 	r.Host = "newgateway.com"
