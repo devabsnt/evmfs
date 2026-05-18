@@ -8,8 +8,11 @@ port: "8080"
 # Local cache directory for fetched chain content. Persistent across restarts.
 cache_dir: "./cache"
 
-# The canonical EVMFS contract address. Same on every chain via CREATE2.
-contract_address: "0x140cbDFf649929D003091a5B8B3be34588753aBA"
+# Optional. The gateway already queries V2 (0xb61cdCDC81d97c32122E668AE782b2327d0a623C)
+# and the canonical V1 address by default. Set this only to add a custom V1-compatible
+# contract; the default V2+V1 list still applies. Use `contract_addresses` to fully
+# override the list.
+# contract_address: "0x140cbDFf649929D003091a5B8B3be34588753aBA"
 
 # RPC URLs per chain ID. Multiple URLs per chain are used for failover.
 # Use public endpoints, your own node, or paid providers — the gateway
@@ -52,9 +55,13 @@ rewrite_from_hosts:
 # `mysite.yourgateway.com`), configure these. Leave commented out
 # otherwise.
 #
-# names_contract: "0x36043906ba7c191c9511a60a8b28e3a602ed1477"
+# names_contract: "0x36043906ba7c191c9511a60a8b28e3a602ed1477"  # V1
 # names_chain_id: "1"
 # gateway_domain: "yourgateway.com"
+#
+# V2 names is auto-defaulted to the canonical address when names_contract is set,
+# so you only need this to override:
+# names_contract_v2: "0x86342282EdF4A1C50249f16f4CB11c5921455730"
 
 # ─── Optional: serve a static frontend ───────────────────────────────────
 # If you want / on the gateway to serve a static landing page (e.g. an

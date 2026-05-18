@@ -293,6 +293,15 @@ EVMFS canonical contract addresses (same on every chain via CREATE2):
 The gateway queries V2 first, then V1, automatically. Operators do not need
 to configure both. V2 is built in.
 
+EVMFS Names registries (Ethereum mainnet only):
+
+- **EVMFSNamesV2** (current): `0x86342282EdF4A1C50249f16f4CB11c5921455730` - cross-checks V1 at registration to block squatting.
+- **EVMFSNames V1** (legacy): `0x36043906ba7c191c9511a60a8b28e3a602ed1477` - still used by the names.evmfs.xyz UI for V1 manifests.
+
+When `names_contract` is set the gateway also queries V2 names automatically
+(V2 first, V1 fallback). Override `names_contract_v2` only to point at a custom
+deployment.
+
 | YAML key             | Env var              | Default                   | Description                              |
 |----------------------|----------------------|---------------------------|------------------------------------------|
 | `port`               | `PORT`               | `8080`                    | TCP port to listen on                    |
@@ -301,7 +310,8 @@ to configure both. V2 is built in.
 | `contract_addresses` | _N/A_                | `[V2, V1]`                | Full list of contracts to try in order. Overrides `contract_address` when set. |
 | `rpc_urls` (map)     | `RPC_URLS`           | _none_                    | Per-chain RPC URLs (see format below)    |
 | `static_dir`         | `STATIC_DIR`         | _none_                    | Optional static frontend served at `/`   |
-| `names_contract`     | `NAMES_CONTRACT`     | _none_                    | EVMFS-Names registry address             |
+| `names_contract`     | `NAMES_CONTRACT`     | _none_                    | EVMFSNames V1 registry address           |
+| `names_contract_v2`  | `NAMES_CONTRACT_V2`  | canonical V2 when V1 set  | EVMFSNames V2 registry address (queried first) |
 | `names_chain_id`     | `NAMES_CHAIN_ID`     | _none_                    | Chain ID the names contract lives on     |
 | `gateway_domain`     | `GATEWAY_DOMAIN`     | _none_                    | Bare domain for subdomain name lookups   |
 | `rewrite_hosts`      | `REWRITE_HOSTS`      | `true`                    | Toggle the URL host rewriter             |

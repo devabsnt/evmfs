@@ -11,7 +11,8 @@
       "evmfs": "0x140cbDFf649929D003091a5B8B3be34588753aBA",
       "evmfsV2": "0xb61cdCDC81d97c32122E668AE782b2327d0a623C",
       "blockIndex": "0x85fce8503683a76371568f2f1347cf2c85dddc39",
-      "evmfsNames": "0x36043906ba7c191c9511a60a8b28e3a602ed1477"
+      "evmfsNames": "0x36043906ba7c191c9511a60a8b28e3a602ed1477",
+      "evmfsNamesV2": "0x86342282EdF4A1C50249f16f4CB11c5921455730"
     },
     "11155111": {
       "name": "Sepolia",
