@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { uploadCommand, deployCommand } from "./upload.js";
-import { registerCommand, updateNameCommand } from "./names.js";
+import { registerCommand, updateNameCommand, NAMES_V2_ADDRESS } from "./names.js";
 import { verifyCommand } from "./verify.js";
 
 const env = process.env;
@@ -54,14 +54,13 @@ program
   .description("Register a .evmfs.xyz subdomain for your deployed site")
   .requiredOption("--name <name>", "Subdomain name (e.g. mysite → mysite.evmfs.xyz)")
   .requiredOption("--manifest <hash>", "Manifest hash to point to")
-  .requiredOption("--block <number>", "Block number of the manifest")
+  .option("--block <number>", "Block number of the manifest (V1 only - V2 reads it on-chain)")
   .option("--rpc <url>", "RPC URL", env.EVMFS_RPC)
   .option("--private-key <key>", "Private key for signing transactions", env.EVMFS_PRIVATE_KEY)
-  .option("--names-contract <address>", "EVMFSNames contract address", env.EVMFS_NAMES_CONTRACT)
+  .option("--names-contract <address>", "EVMFSNames contract address (defaults to V2)", env.EVMFS_NAMES_CONTRACT ?? NAMES_V2_ADDRESS)
   .action((opts) => {
     if (!opts.rpc) { console.error("Error: --rpc or EVMFS_RPC is required"); process.exit(1); }
     if (!opts.privateKey) { console.error("Error: --private-key or EVMFS_PRIVATE_KEY is required"); process.exit(1); }
-    if (!opts.namesContract) { console.error("Error: --names-contract or EVMFS_NAMES_CONTRACT is required"); process.exit(1); }
     return registerCommand(opts);
   });
 
@@ -70,14 +69,13 @@ program
   .description("Update your .evmfs.xyz subdomain to point to a new manifest")
   .requiredOption("--name <name>", "Subdomain name to update")
   .requiredOption("--manifest <hash>", "New manifest hash")
-  .requiredOption("--block <number>", "Block number of the new manifest")
+  .option("--block <number>", "Block number of the new manifest (V1 only - V2 reads it on-chain)")
   .option("--rpc <url>", "RPC URL", env.EVMFS_RPC)
   .option("--private-key <key>", "Private key for signing transactions", env.EVMFS_PRIVATE_KEY)
-  .option("--names-contract <address>", "EVMFSNames contract address", env.EVMFS_NAMES_CONTRACT)
+  .option("--names-contract <address>", "EVMFSNames contract address (defaults to V2)", env.EVMFS_NAMES_CONTRACT ?? NAMES_V2_ADDRESS)
   .action((opts) => {
     if (!opts.rpc) { console.error("Error: --rpc or EVMFS_RPC is required"); process.exit(1); }
     if (!opts.privateKey) { console.error("Error: --private-key or EVMFS_PRIVATE_KEY is required"); process.exit(1); }
-    if (!opts.namesContract) { console.error("Error: --names-contract or EVMFS_NAMES_CONTRACT is required"); process.exit(1); }
     return updateNameCommand(opts);
   });
 

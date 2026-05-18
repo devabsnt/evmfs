@@ -21,9 +21,8 @@ func (c *Cache) Set(chainId, contentHash string, data []byte) error {
 	return writeFile(filepath.Join(c.Dir, chainId), contentHash, data)
 }
 
-// GetRaw returns bytes stored exactly as fetched from chain (not gunzipped).
-// Used for multi-chunk file parts where each chunk is a slice of a gzipped
-// payload and can only be decompressed once all chunks are concatenated.
+// GetRaw returns bytes as fetched from chain (not gunzipped). Used for
+// multipart chunks, which can only be decompressed after concatenation.
 func (c *Cache) GetRaw(chainId, contentHash string) ([]byte, error) {
 	return readFile(filepath.Join(c.Dir, chainId, "raw", contentHash))
 }

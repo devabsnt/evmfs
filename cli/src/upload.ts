@@ -309,11 +309,7 @@ export async function uploadCommand(options: UploadOptions): Promise<void> {
 
     console.log(`  Manifest confirmed in block ${receipt.blockNumber}`);
 
-    // Auto-register the manifest in EVMFSBlockIndex so future consumers can
-    // fetch by hash alone (no eth_getLogs scan required). Soft-fails — the
-    // upload itself already succeeded, so any registration error just logs
-    // a note and continues. Skipped automatically when uploading to V2,
-    // which records the block in its own storage.
+    // Skipped for V2 (records block in its own storage). Soft-fails.
     if (!options.noBlockIndex && state.manifestHash && !isV2Contract(contractAddress)) {
       await registerInBlockIndex({
         wallet,
@@ -629,9 +625,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
 
     console.log(`  Manifest confirmed in block ${receipt.blockNumber}`);
 
-    // Auto-register the manifest in EVMFSBlockIndex (see uploadCommand
-    // above for rationale). Skipped when uploading to V2 — V2 records
-    // (uploader, block) in its own storage so registration is redundant.
+    // Skipped for V2 (records block in its own storage). Soft-fails.
     if (!options.noBlockIndex && state.manifestHash && !isV2Contract(contractAddress)) {
       await registerInBlockIndex({
         wallet,

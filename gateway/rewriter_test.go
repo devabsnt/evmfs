@@ -39,8 +39,7 @@ func TestIsRewriteable(t *testing.T) {
 func TestRewriteURLs_SkipsBinaryContent(t *testing.T) {
 	r := httptest.NewRequest("GET", "https://newgateway.com/foo", nil)
 	r.Host = "newgateway.com"
-	// PNG header bytes containing the string "evmfs.xyz" in payload —
-	// rewriter should leave them alone because content type is image/png.
+	// PNG bytes containing "evmfs.xyz" must be passed through unchanged.
 	payload := []byte("\x89PNG\r\n\x1a\n  evmfs.xyz some image bytes")
 	out, rw := rewriteURLs(payload, "image/png", r, []string{"evmfs.xyz"})
 	if rw {
@@ -116,10 +115,8 @@ func TestRewriteURLs_MultipleHosts(t *testing.T) {
 }
 
 func TestRewriteURLs_NoOpWhenHostedOnCanonicalHost(t *testing.T) {
-	// When the gateway is hosted at evmfs.xyz itself, rewriting evmfs.xyz
-	// references would be an identity substitution. The rewriter must skip
-	// it and leave the response untouched (no X-EVMFS-Rewritten header, no
-	// shortened cache header).
+	// Identity substitution must not mark response as rewritten (preserves
+	// immutable cache header).
 	r := httptest.NewRequest("GET", "https://evmfs.xyz/foo", nil)
 	r.Host = "evmfs.xyz"
 	r.Header.Set("X-Forwarded-Proto", "https")
@@ -135,8 +132,7 @@ func TestRewriteURLs_NoOpWhenHostedOnCanonicalHost(t *testing.T) {
 }
 
 func TestRewriteURLs_HttpToHttpsOnSameHostStillRewrites(t *testing.T) {
-	// Even hosted at evmfs.xyz, an http://evmfs.xyz reference should be
-	// upgraded to https://evmfs.xyz — that's a meaningful change.
+	// http -> https upgrade on the canonical host is a meaningful change.
 	r := httptest.NewRequest("GET", "https://evmfs.xyz/foo", nil)
 	r.Host = "evmfs.xyz"
 	r.Header.Set("X-Forwarded-Proto", "https")
@@ -186,7 +182,6 @@ func TestRewriteURLs_PreservesUnrelatedJsonStructure(t *testing.T) {
 
 	in := []byte(`{"name":"SKRUMP #1","description":"see https://evmfs.xyz for more","image":"https://evmfs.xyz/143/X/Y/1.png","attributes":[{"trait_type":"color","value":"red"}]}`)
 	out, _ := rewriteURLs(in, "application/json", r, []string{"evmfs.xyz"})
-	// Both occurrences (description and image) should be rewritten.
 	if strings.Contains(string(out), "evmfs.xyz") {
 		t.Errorf("rewrite missed an occurrence: %s", out)
 	}

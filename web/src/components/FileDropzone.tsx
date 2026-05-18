@@ -81,7 +81,7 @@ export function FileDropzone({ onFiles, disabled, mode = "files" }: FileDropzone
           const item = e.dataTransfer.items[i];
           const entry = item.webkitGetAsEntry?.();
           if (entry) {
-            // For top-level directory entries, don't include the dir name in paths
+            // Top-level dir: strip the dir name so paths are relative to it
             if (entry.isDirectory) {
               const dirReader = (entry as FileSystemDirectoryEntry).createReader();
               const entries = await new Promise<FileSystemEntry[]>((resolve, reject) => {
@@ -122,12 +122,11 @@ export function FileDropzone({ onFiles, disabled, mode = "files" }: FileDropzone
       if (rawFiles.length === 0) return;
 
       if (isFolder) {
-        // webkitRelativePath gives "folderName/sub/file.txt" — strip the leading folder name
+        // webkitRelativePath is "folderName/sub/file.txt" - strip the leading folder name
         const filesWithPaths = rawFiles
           .filter((f) => !f.name.startsWith("."))
           .map((f) => {
             const rel = (f as { webkitRelativePath?: string }).webkitRelativePath ?? f.name;
-            // Strip leading folder name
             const parts = rel.split("/");
             const trimmed = parts.length > 1 ? parts.slice(1).join("/") : rel;
             return createFileWithPath(f, trimmed);
@@ -141,7 +140,6 @@ export function FileDropzone({ onFiles, disabled, mode = "files" }: FileDropzone
     [onFiles, isFolder]
   );
 
-  // Build input props conditionally for folder mode
   const inputProps: Record<string, unknown> = {};
   if (isFolder) {
     inputProps.webkitdirectory = "";

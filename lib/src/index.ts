@@ -1,7 +1,7 @@
 import { fetchContent, STORE_EVENT_TOPIC } from "./rpc.js";
 import { tryGunzip } from "./decompress.js";
 import { verifyHash } from "./keccak256.js";
-import { defaultBlockIndex, lookupBlock } from "./blockIndex.js";
+import { defaultBlockIndex, isV2Contract, lookupBlock } from "./blockIndex.js";
 import type { EVMFSOptions, ManifestEntry } from "./types.js";
 
 export type { EVMFSOptions, ManifestEntry };
@@ -21,21 +21,19 @@ export class EVMFS {
     this.blockIndex = options.blockIndex ?? defaultBlockIndex(options.chainId);
   }
 
-  /**
-   * Look up a manifest's block via the configured EVMFSBlockIndex contract.
-   * Returns 0 if no index is configured, the hash isn't registered, or any
-   * RPC error — callers should fall back to a log scan in that case.
-   */
+  /** Resolve a manifest's block. Queries EVMFSV2 directly when configured
+   *  for V2 (block stored on the contract itself), else the BlockIndex
+   *  sidecar for V1. Returns 0 if unknown - caller falls back to a log scan. */
   async resolveBlock(manifestHash: string): Promise<number> {
+    if (isV2Contract(this.contract)) {
+      const b = await lookupBlock(this.rpcUrl, this.contract, manifestHash);
+      if (b > 0) return b;
+    }
     if (!this.blockIndex) return 0;
     return lookupBlock(this.rpcUrl, this.blockIndex, manifestHash);
   }
 
-  /**
-   * Fetch and parse the manifest for a given hash. If `manifestBlock` is
-   * omitted (or 0), the block is resolved via the configured BlockIndex;
-   * if that also fails the underlying fetcher does a log scan.
-   */
+  /** Fetch and parse the manifest for a given hash. */
   async manifest(manifestHash: string, manifestBlock?: number): Promise<ManifestEntry[]> {
     let block = manifestBlock ?? 0;
     if (!block) block = await this.resolveBlock(manifestHash);
@@ -51,11 +49,7 @@ export class EVMFS {
     return JSON.parse(text) as ManifestEntry[];
   }
 
-  /**
-   * Fetch a single file by name or numeric index from a manifest.
-   * If `manifestBlock` is omitted, the block is resolved via the configured
-   * BlockIndex (with log-scan fallback inside the fetcher).
-   */
+  /** Fetch a single file by name or numeric index from a manifest. */
   async fetch(manifestHash: string, manifestBlock: number | undefined, path: string): Promise<Uint8Array> {
     const entries = await this.manifest(manifestHash, manifestBlock);
     const entry = this.resolveEntry(entries, path);
@@ -65,10 +59,7 @@ export class EVMFS {
     return this.fetchEntry(entry);
   }
 
-  /**
-   * Fetch all files in a manifest with concurrency control. Pass
-   * `manifestBlock = undefined` to auto-resolve via the BlockIndex.
-   */
+  /** Fetch all files in a manifest with concurrency control. */
   async fetchAll(
     manifestHash: string,
     manifestBlock: number | undefined,
@@ -82,13 +73,11 @@ export class EVMFS {
     const result = new Map<string, Uint8Array>();
     let completed = 0;
 
-    // Build work queue
     const work: { key: string; entry: ManifestEntry }[] = entries.map((e, i) => ({
       key: e.f ?? String(i),
       entry: e,
     }));
 
-    // Process with concurrency pool
     const pool: Promise<void>[] = [];
     let idx = 0;
 
@@ -111,13 +100,11 @@ export class EVMFS {
   }
 
   private resolveEntry(entries: ManifestEntry[], path: string): ManifestEntry | null {
-    // Try numeric index
     const idx = parseInt(path, 10);
     if (!isNaN(idx) && String(idx) === path && idx >= 0 && idx < entries.length) {
       return entries[idx];
     }
 
-    // Try filename match
     for (const e of entries) {
       if (e.f === path) return e;
     }
@@ -127,7 +114,6 @@ export class EVMFS {
 
   private async fetchEntry(entry: ManifestEntry): Promise<Uint8Array> {
     if (entry.p && entry.p.length > 0) {
-      // Multipart
       const parts = await Promise.all(
         entry.p.map((part) =>
           fetchContent(this.rpcUrl, this.contract, STORE_EVENT_TOPIC, part.h, part.b)
@@ -143,7 +129,6 @@ export class EVMFS {
       return tryGunzip(combined);
     }
 
-    // Single chunk
     if (!entry.h) {
       throw new Error("Manifest entry has no hash");
     }
@@ -156,7 +141,6 @@ export class EVMFS {
     );
     const data = await tryGunzip(raw);
 
-    // Verify hash if possible
     await verifyHash(raw, entry.h);
 
     return data;

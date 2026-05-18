@@ -32,11 +32,11 @@ This is a **one-time cost**. Nothing ever expires. There is no pinning service, 
 
 ### A note on fees
 
-**The EVMFS contract charges no fees.** It has no admin key, no fee switch, no mechanism anyone can flip later to extract value at the protocol level — the contract is immutable and owner-less by design.
+**The EVMFS contract charges no fees.** It has no admin key, no fee switch, no mechanism anyone can flip later to extract value at the protocol level - the contract is immutable and owner-less by design.
 
-The hosted frontend at **evmfs.xyz includes a small convenience fee** on uploads to sustain hosting and development. **Direct contract interaction, the CLI, and self-hosted deployments of the frontend are always free.** If you don't want to pay the convenience fee, clone the repo and upload directly — the contract doesn't know or care who's calling it.
+The hosted frontend at **evmfs.xyz includes a small convenience fee** on uploads to sustain hosting and development. **Direct contract interaction, the CLI, and self-hosted deployments of the frontend are always free.** If you don't want to pay the convenience fee, clone the repo and upload directly - the contract doesn't know or care who's calling it.
 
-This is the same pattern Uniswap uses: free contract, hosted frontend earns its keep. You're paying for convenience, not for access. The worst case is the frontend fee changes and someone forks the UI — which is fine, because that's how open infrastructure should work.
+This is the same pattern Uniswap uses: free contract, hosted frontend earns its keep. You're paying for convenience, not for access. The worst case is the frontend fee changes and someone forks the UI - which is fine, because that's how open infrastructure should work.
 
 ### Where EVMFS makes sense
 
@@ -66,7 +66,7 @@ npm install -g evmfs-cli
 # Set env vars (or pass as flags)
 export EVMFS_RPC=https://eth.llamarpc.com
 export EVMFS_PRIVATE_KEY=0x...
-export EVMFS_CONTRACT=0x140cbDFf649929D003091a5B8B3be34588753aBA
+export EVMFS_CONTRACT=0xb61cdCDC81d97c32122E668AE782b2327d0a623C   # V2 (recommended)
 
 # Deploy a static site (preserves file paths)
 evmfs deploy --folder ./dist
@@ -89,7 +89,7 @@ All flags can be set via environment variables. Flags override env vars when bot
 |---|---|---|
 | `EVMFS_RPC` | `--rpc` | *(required)* |
 | `EVMFS_PRIVATE_KEY` | `--private-key` | *(required)* |
-| `EVMFS_CONTRACT` | `--contract` | — |
+| `EVMFS_CONTRACT` | `--contract` | - |
 | `EVMFS_CHAIN_ID` | `--chain-id` | `1` |
 | `EVMFS_GATEWAY` | `--gateway` | `https://evmfs.xyz` |
 | `EVMFS_GAS_LIMIT` | `--gas-limit` | `25000000` |
@@ -110,7 +110,7 @@ https://evmfs.xyz/{chainId}/{block}/{manifestHash}/assets/style.css
 3. Choose **Upload files** (NFT metadata) or **Deploy site** (static site with paths)
 4. Drop your files or folder
 5. Review the live cost estimate (fetches gas price + ETH price every 30s)
-6. Click Upload — batches sign one at a time, progress saves to localStorage so you can resume if interrupted
+6. Click Upload - batches sign one at a time, progress saves to localStorage so you can resume if interrupted
 7. Copy the base URI and paste it into your NFT contract, or click "Visit site" for deployed sites
 
 ### JavaScript library
@@ -124,7 +124,7 @@ import { EVMFS } from "evmfs-lib";
 
 const fs = new EVMFS({
   rpc: "https://eth.llamarpc.com",
-  contract: "0x140cbDFf649929D003091a5B8B3be34588753aBA"
+  contract: "0xb61cdCDC81d97c32122E668AE782b2327d0a623C" // V2
 });
 
 // Fetch a single file by path
@@ -150,7 +150,7 @@ evmfs update-name --name mysite --manifest 0xdef... --block 24827000 \
   --names-contract 0x36043906ba7c191c9511a60a8b28e3a602ed1477
 ```
 
-Names are ERC-721 NFTs — transferable and tradeable on any marketplace. The gateway resolves names on-chain with zero configuration. Only the wallet that uploaded a manifest can register a name for it.
+Names are ERC-721 NFTs - transferable and tradeable on any marketplace. The gateway resolves names on-chain with zero configuration. Only the wallet that uploaded a manifest can register a name for it.
 
 - **EVMFSNames contract** (mainnet): `0x36043906ba7c191c9511a60a8b28e3a602ed1477`
 
@@ -166,11 +166,11 @@ Also works with Caddy, nginx, or any reverse proxy. Full guide in the Docs tab a
 
 ### Security note on auto-signing
 
-The "private key (auto-sign)" option exists because clicking MetaMask 50 times for a 10k-file upload is not a product. **The key stays in browser memory only** — it is never sent to any server, never written to localStorage, never persisted anywhere. Refresh the page and it's gone. If you're uploading from a dedicated deployment wallet, this is the fastest path.
+The "private key (auto-sign)" option exists because clicking MetaMask 50 times for a 10k-file upload is not a product. **The key stays in browser memory only** - it is never sent to any server, never written to localStorage, never persisted anywhere. Refresh the page and it's gone. If you're uploading from a dedicated deployment wallet, this is the fastest path.
 
 ---
 
-## Permanence — what this actually guarantees
+## Permanence - what this actually guarantees
 
 **The gateway at `evmfs.xyz` is a convenience layer, not a dependency.** If it vanishes tomorrow, your files remain fully retrievable. Here are the escalating recovery paths:
 
@@ -180,12 +180,11 @@ The gateway is ~1,000 lines of Go in `gateway/`. Clone, `docker build`, point it
 
 ```bash
 docker run -p 8080:8080 \
-  -e CONTRACT_ADDRESS=0x140cbDFf649929D003091a5B8B3be34588753aBA \
   -e RPC_URLS="1=https://eth.llamarpc.com" \
   evmfs-gateway
 ```
 
-Your NFT base URIs keep working. Multiple gateways coexist; the URL path format is standard.
+The gateway queries V2 first and falls back to V1 automatically, so no contract address is required for default setups. Set `CONTRACT_ADDRESSES=0x...,0x...` only if you want to override the default V2+V1 list (e.g. to point at a custom contract). Your NFT base URIs keep working. Multiple gateways coexist; the URL path format is standard.
 
 ### Path 2: Fetch directly via any Ethereum RPC
 
@@ -222,10 +221,10 @@ Etherscan's API exposes `eth_getLogs`. Every archive node serves the same data. 
 
 ### The 36 bytes you need to keep
 
-- `contractAddress`: `0x140cbDFf649929D003091a5B8B3be34588753aBA` (mainnet)
+- `contractAddress`: `0xb61cdCDC81d97c32122E668AE782b2327d0a623C` (V2 mainnet) or `0x140cbDFf649929D003091a5B8B3be34588753aBA` (V1 mainnet)
 - `chainId`: `1` (Ethereum mainnet)
 - `manifestHash`: 32-byte hash
-- `manifestBlock`: block number
+- `manifestBlock`: block number (V2 also stores this on-chain; V1 needs the BlockIndex sidecar or a known block)
 
 Those values unlock everything you uploaded, forever.
 
@@ -250,7 +249,10 @@ Same address on every chain via CREATE2 deployment through the Safe Singleton Fa
 
 ### EVMFSNames (subdomain registry)
 
-- **Ethereum mainnet** (chain ID `1`): `0x36043906ba7c191c9511a60a8b28e3a602ed1477`
+Two contracts coexist. Gateways query V2 first, fall back to V1.
+
+- **EVMFSNamesV2** (current): `0x86342282edF4A1c50249f16f4Cb11C5921455730` - registers names against V2 manifests. Cross-checks V1 at registration time so V1 names cannot be squatted on V2 by a third party. V1 name owners can register the same name on V2 and "upgrade" to V2 content.
+- **EVMFSNames V1** (legacy): `0x36043906ba7c191c9511a60a8b28e3a602ed1477` - still the contract used by the [names.evmfs.xyz](https://names.evmfs.xyz) UI and the `evmfs register` CLI command, both of which target V1 manifests. Names registered here continue to resolve through every gateway.
 
 ### EVMFSBlockIndex (sidecar for V1 content)
 

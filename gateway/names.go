@@ -53,7 +53,6 @@ func NewNameCache() *NameCache {
 }
 
 // do collapses concurrent lookups for the same name into a single fn() call.
-// Other callers wait for the first call to complete and receive the same result.
 func (c *NameCache) do(name string, fn func() (*SiteInfo, error)) (*SiteInfo, error) {
 	c.flightMu.Lock()
 	if inf, ok := c.flight[name]; ok {
@@ -91,7 +90,7 @@ func (c *NameCache) set(name string, info *SiteInfo, err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if len(c.entries) >= nameCacheMaxSize {
-		// Drop expired entries; if still full, drop arbitrary ones.
+		// Drop expired first; if still full, drop arbitrary entries.
 		now := time.Now()
 		for k, v := range c.entries {
 			if now.After(v.expiresAt) {
@@ -127,8 +126,8 @@ func (c *NameCache) cleanupLoop() {
 	}
 }
 
-// lookupName queries the EVMFSNames contract for a registered name.
-// Calls lookup(string) which returns (address owner, uint64 blockNumber, bytes32 manifestHash).
+// lookupName resolves a name via lookup(string). V2 anti-squat is enforced
+// at registration time, so V2-then-V1 priority is safe.
 func (s *Server) lookupName(name string) (*SiteInfo, error) {
 	if s.Config.NamesContract == "" || s.Config.NamesChainId == "" {
 		return nil, fmt.Errorf("names contract not configured")
@@ -145,12 +144,10 @@ func (s *Server) lookupName(name string) (*SiteInfo, error) {
 		return nil, fmt.Errorf("no RPC URLs for names chain %s", s.Config.NamesChainId)
 	}
 
-	// Build calldata: lookup(string)
 	selectorHash := sha3.NewLegacyKeccak256()
 	selectorHash.Write([]byte("lookup(string)"))
 	selector := selectorHash.Sum(nil)[:4]
 
-	// ABI-encode the string argument
 	nameBytes := []byte(name)
 	offset := make([]byte, 32)
 	offset[31] = 0x20
@@ -165,11 +162,15 @@ func (s *Server) lookupName(name string) (*SiteInfo, error) {
 	calldata := append(selector, offset...)
 	calldata = append(calldata, length...)
 	calldata = append(calldata, padded...)
-
 	calldataHex := "0x" + hex.EncodeToString(calldata)
 
+	var contracts []string
+	if s.Config.NamesContractV2 != "" {
+		contracts = append(contracts, s.Config.NamesContractV2)
+	}
+	contracts = append(contracts, s.Config.NamesContract)
+
 	doRPC := func() (*SiteInfo, error) {
-		// Re-check cache: a concurrent caller may have populated it while we waited.
 		if s.NameCache != nil {
 			if e, ok := s.NameCache.get(name); ok {
 				return e.info, e.err
@@ -177,25 +178,36 @@ func (s *Server) lookupName(name string) (*SiteInfo, error) {
 		}
 
 		var lastErr error
-		for _, rpcURL := range rpcURLs {
-			result, err := ethCall(rpcURL, s.Config.NamesContract, calldataHex)
-			if err != nil {
-				lastErr = err
-				continue
-			}
+		var sawNotRegistered bool
 
-			info, err := decodeLookupResult(result)
-			if err != nil {
-				lastErr = err
-				continue
+		for _, contract := range contracts {
+			for _, rpcURL := range rpcURLs {
+				result, err := ethCall(rpcURL, contract, calldataHex)
+				if err != nil {
+					lastErr = err
+					continue
+				}
+				info, err := decodeLookupResult(result)
+				if err != nil {
+					if errors.Is(err, ErrNameNotRegistered) {
+						sawNotRegistered = true
+					}
+					lastErr = err
+					// Not-registered: move to next contract. Transient: try next RPC.
+					if errors.Is(err, ErrNameNotRegistered) {
+						break
+					}
+					continue
+				}
+				if s.NameCache != nil {
+					s.NameCache.set(name, info, nil)
+				}
+				return info, nil
 			}
-			if s.NameCache != nil {
-				s.NameCache.set(name, info, nil)
-			}
-			return info, nil
 		}
-		if errors.Is(lastErr, ErrNameNotRegistered) {
-			err := fmt.Errorf("lookup failed: %w", lastErr)
+
+		if sawNotRegistered {
+			err := fmt.Errorf("lookup failed: %w", ErrNameNotRegistered)
 			if s.NameCache != nil {
 				s.NameCache.set(name, nil, err)
 			}
@@ -239,11 +251,10 @@ func ethCall(rpcURL, to, data string) (string, error) {
 	return result, nil
 }
 
-// decodeLookupResult decodes: (address owner, uint64 blockNumber, bytes32 manifestHash)
-// = 3 x 32 bytes = 96 bytes
+// decodeLookupResult decodes (address owner, uint64 blockNumber, bytes32 manifestHash).
 func decodeLookupResult(hexData string) (*SiteInfo, error) {
 	hexData = strings.TrimPrefix(hexData, "0x")
-	if len(hexData) < 192 { // 96 bytes = 192 hex chars
+	if len(hexData) < 192 {
 		return nil, fmt.Errorf("response too short: %d chars", len(hexData))
 	}
 
@@ -252,7 +263,6 @@ func decodeLookupResult(hexData string) (*SiteInfo, error) {
 		return nil, fmt.Errorf("hex decode error: %w", err)
 	}
 
-	// Word 0: address (last 20 bytes of 32-byte word)
 	owner := data[12:32]
 	isZero := true
 	for _, b := range owner {
@@ -265,13 +275,11 @@ func decodeLookupResult(hexData string) (*SiteInfo, error) {
 		return nil, ErrNameNotRegistered
 	}
 
-	// Word 1: uint64 blockNumber (last 8 bytes)
 	blockNum := int64(0)
 	for _, b := range data[56:64] {
 		blockNum = blockNum*256 + int64(b)
 	}
 
-	// Word 2: bytes32 manifestHash
 	manifestHash := "0x" + hex.EncodeToString(data[64:96])
 
 	return &SiteInfo{

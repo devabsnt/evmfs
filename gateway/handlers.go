@@ -57,7 +57,7 @@ func isBlockNumber(s string) bool {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Check for subdomain-based name resolution (e.g. mysite.evmfs.xyz)
+	// Subdomain-based name resolution (e.g. mysite.evmfs.xyz).
 	if s.Config.GatewayDomain != "" && s.Config.NamesContract != "" {
 		host := strings.Split(r.Host, ":")[0]
 		if strings.HasSuffix(host, "."+s.Config.GatewayDomain) {
@@ -115,17 +115,8 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("ok"))
 }
 
-// handleResolve accepts a full EVMFS URL via ?url=... and dispatches it
-// through the normal router. Useful for programmatic callers (browser
-// extensions, CLI fallbacks, custom proxies) that want to resolve a URL
-// regardless of which host it points to. Examples:
-//
-//	GET /resolve?url=https://evmfs.xyz/143/71117086/0x764b.../1.png
-//	GET /resolve?url=/143/71117086/0x764b.../1.png
-//	GET /resolve?url=https://other.gateway.com/1/24833445/0x4b0c.../index.html
-//
-// We strip the scheme + host (if present) and re-route on the path portion.
-// Query/fragment are dropped — they're not part of the EVMFS URL grammar.
+// handleResolve accepts a full EVMFS URL via ?url=... and re-dispatches on
+// the path portion. Query and fragment are dropped (not part of EVMFS grammar).
 func (s *Server) handleResolve(w http.ResponseWriter, r *http.Request) {
 	u := r.URL.Query().Get("url")
 	if u == "" {
@@ -133,7 +124,6 @@ func (s *Server) handleResolve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Strip scheme + host. Keep only the path.
 	path := u
 	if i := strings.Index(path, "://"); i >= 0 {
 		path = path[i+3:]
@@ -146,14 +136,10 @@ func (s *Server) handleResolve(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
 	}
-	// Drop query + fragment from the inner URL — they're not part of the
-	// canonical EVMFS path grammar.
 	if i := strings.IndexAny(path, "?#"); i >= 0 {
 		path = path[:i]
 	}
 
-	// Re-dispatch with the rewritten path. We clone the request so the
-	// inner handlers see a clean URL.
 	clone := r.Clone(r.Context())
 	newURL := *r.URL
 	newURL.Path = path
@@ -210,9 +196,8 @@ func findByFilename(entries []manifestEntry, path string) int {
 	return -1
 }
 
-// findByFilenameStem matches against the file's basename without extension.
-// E.g. stem="1" matches a manifest entry with F="1.png" or F="1.gif".
-// Returns the first match in array order; -1 if none.
+// findByFilenameStem matches a manifest entry by basename without extension
+// (stem="1" matches F="1.png"). Returns -1 if none.
 func findByFilenameStem(entries []manifestEntry, stem string) int {
 	if stem == "" {
 		return -1
@@ -272,16 +257,9 @@ func (s *Server) handleManifestOrFile(w http.ResponseWriter, r *http.Request, ch
 		return
 	}
 
-	// Resolve pathOrIndex to a manifest entry index.
-	// Order:
-	//   1. Exact filename match (named manifests).
-	//   2. Filename-stem match for extensionless requests (e.g. "/1" → "1.png").
-	//      Lets metadata reference siblings without baking in extensions.
-	//   3. Numeric-index fallback (legacy / unnamed manifests). For named
-	//      manifests this is a last resort to preserve backward compatibility,
-	//      but step 2 typically catches the cases where step 3 used to silently
-	//      return the wrong file.
-	//   4. SPA fallback to index.html for extensionless / .html paths.
+	// Resolution order: exact filename, stem match (extensionless), numeric
+	// index, SPA fallback to index.html. Stem match catches cases where
+	// numeric fallback used to silently return the wrong file.
 	entryIdx := -1
 	named := hasFilenames(entries)
 
@@ -299,8 +277,6 @@ func (s *Server) handleManifestOrFile(w http.ResponseWriter, r *http.Request, ch
 		}
 	}
 
-	// SPA fallback: only when named manifest, path not found, and path has no
-	// file extension or extension is .html
 	if entryIdx < 0 && named {
 		ext := filepath.Ext(pathOrIndex)
 		if ext == "" || ext == ".html" {
@@ -341,7 +317,6 @@ func (s *Server) handleManifestOrFile(w http.ResponseWriter, r *http.Request, ch
 		}
 	}
 
-	// Extension-based content type for named files, magic-byte fallback
 	contentType := ""
 	if entry.F != "" {
 		contentType = contentTypeByExtension(entry.F)
@@ -362,7 +337,6 @@ func (s *Server) handleNamedSite(w http.ResponseWriter, r *http.Request, name st
 
 	path := strings.TrimPrefix(r.URL.Path, "/")
 	if path == "" {
-		// Try index.html first, fall back to directory listing
 		s.handleNamedRoot(w, r, info)
 		return
 	}
@@ -381,12 +355,10 @@ func (s *Server) handleNamedRoot(w http.ResponseWriter, r *http.Request, info *S
 		http.Error(w, "failed to parse manifest", http.StatusInternalServerError)
 		return
 	}
-	// If manifest has an index.html, serve it
 	if idx := findByFilename(entries, "index.html"); idx >= 0 {
 		s.handleManifestOrFile(w, r, chainId, info.ManifestHash, "index.html", info.BlockNumber)
 		return
 	}
-	// Otherwise show directory listing
 	s.handleDirectory(w, r, chainId, info.ManifestHash, info.BlockNumber)
 }
 
@@ -410,10 +382,8 @@ func (s *Server) handleDirectory(w http.ResponseWriter, r *http.Request, chainId
 		return
 	}
 
-	// If the manifest contains an index.html and the caller didn't ask for
-	// the JSON listing, serve index.html. A trailing-slash URL on a
-	// site-style manifest should load the site, not the file listing.
-	// Mirrors handleNamedRoot's behavior.
+	// Trailing-slash URL on a site-style manifest serves index.html, not
+	// the listing. Mirrors handleNamedRoot.
 	if r.URL.Query().Get("format") != "json" {
 		if idx := findByFilename(entries, "index.html"); idx >= 0 {
 			s.handleManifestOrFile(w, r, chainId, manifestHash, "index.html", blockHint)
@@ -624,20 +594,14 @@ func gunzip(data []byte) ([]byte, error) {
 }
 
 func (s *Server) serveContent(w http.ResponseWriter, r *http.Request, data []byte, contentType string) {
-	// URL host rewriting: scan text-based responses for hardcoded references
-	// to other gateways (typically evmfs.xyz) and replace them with the
-	// current request's host. Lets collection owners migrate gateways
-	// with a single setBaseURI() — metadata files don't have to be
-	// re-uploaded. See rewriter.go for full details.
 	if s.Config.RewriteHosts {
 		if rewritten, ok := rewriteURLs(data, contentType, r, s.Config.RewriteFromHosts); ok {
 			data = rewritten
 			w.Header().Set("X-EVMFS-Rewritten",
 				"from="+strings.Join(s.Config.RewriteFromHosts, ",")+"; to="+r.Host)
-			// Rewritten responses no longer match the immutable on-chain
-			// bytes byte-for-byte (their hash would differ). Treat them
-			// as cacheable but shorter-lived so a misconfiguration can be
-			// rolled back faster than the year-long immutable cache.
+			// Rewritten bytes no longer match on-chain hash, so use a
+			// shorter TTL than the year-long immutable cache to allow
+			// faster rollback of misconfiguration.
 			w.Header().Set("Cache-Control", "public, max-age=3600")
 		} else {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")

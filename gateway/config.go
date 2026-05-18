@@ -13,68 +13,54 @@ type Config struct {
 	CacheDir        string              `yaml:"cache_dir"`
 	RPCURLs         map[string][]string `yaml:"rpc_urls"`
 	ContractAddress string              `yaml:"contract_address"`
-	// ContractAddresses is the full list of EVMFS contract addresses to
-	// query. When set, supersedes ContractAddress. Allows the gateway to
-	// serve content from both V1 and V2 (and any future versions) without
-	// the caller needing to specify which. Tried in order; the first one
-	// that returns a log wins. Default: [ContractAddress, V2 address] when
-	// only the legacy single field is set, ensuring V1 + V2 both work
-	// out of the box.
+	// Tried in order; first match wins. Supersedes ContractAddress.
 	ContractAddresses []string `yaml:"contract_addresses"`
 	StaticDir       string              `yaml:"static_dir"`
 	NamesContract   string              `yaml:"names_contract"`
+	// V2 queried before V1 when set. Defaults to canonical V2 address when NamesContract is configured.
+	NamesContractV2 string              `yaml:"names_contract_v2"`
 	NamesChainId    string              `yaml:"names_chain_id"`
 	GatewayDomain   string              `yaml:"gateway_domain"`
 
-	// RewriteHosts toggles the URL host rewriter (see rewriter.go). When
-	// true, text-based content served by this gateway has references to
-	// hosts in RewriteFromHosts rewritten to the request's current host.
-	// This is what lets a collection migrate from evmfs.xyz to a self-hosted
-	// gateway with a single setBaseURI() transaction — metadata files
-	// still contain hardcoded "https://evmfs.xyz/..." URLs in their on-chain
-	// bytes, but the gateway normalizes them on the way out.
+	// Enables host-rewriting of text content so a collection can migrate
+	// gateways via setBaseURI() alone without re-uploading metadata. See rewriter.go.
 	RewriteHosts bool `yaml:"rewrite_hosts"`
 
-	// RewriteFromHosts is the list of source hosts the rewriter watches
-	// for. Defaults to ["evmfs.xyz", "www.evmfs.xyz"] when RewriteHosts is
-	// enabled and no explicit list is given.
+	// Defaults to ["evmfs.xyz", "www.evmfs.xyz"] when RewriteHosts is on and unset.
 	RewriteFromHosts []string `yaml:"rewrite_from_hosts"`
 }
 
-// applyRewriteDefaults sets sensible defaults for the rewriter when the
-// config opts in but doesn't list explicit hosts.
 func (c *Config) applyRewriteDefaults() {
 	if c.RewriteHosts && len(c.RewriteFromHosts) == 0 {
 		c.RewriteFromHosts = []string{"evmfs.xyz", "www.evmfs.xyz"}
 	}
 }
 
-// EVMFSV2 contract address (same on every chain via CREATE2).
+// Same on every chain via CREATE2.
 const evmfsV2Address = "0xb61cdCDC81d97c32122E668AE782b2327d0a623C"
 
-// applyContractDefaults derives ContractAddresses from the legacy single
-// ContractAddress field if the operator hasn't set an explicit list. The
-// resulting list contains V2 (tried first — recommended for new uploads)
-// followed by the configured V1 address (fallback for legacy content).
-// Operators with collections on a non-canonical contract can override the
-// whole list via `contract_addresses:` in YAML or CONTRACT_ADDRESSES env.
+// Ethereum mainnet.
+const evmfsNamesV2Address = "0x86342282edF4A1c50249f16f4Cb11C5921455730"
+
+func (c *Config) applyNamesDefaults() {
+	if c.NamesContract != "" && c.NamesContractV2 == "" {
+		c.NamesContractV2 = evmfsNamesV2Address
+	}
+}
+
 func (c *Config) applyContractDefaults() {
 	if len(c.ContractAddresses) > 0 {
-		return // operator set an explicit list; respect it
+		return
 	}
 	var list []string
-	// V2 first — forward-looking. Most new content lives here.
 	list = append(list, evmfsV2Address)
-	// V1 fallback — legacy content (e.g. Skrumpeys) still works.
 	if c.ContractAddress != "" && !strings.EqualFold(c.ContractAddress, evmfsV2Address) {
 		list = append(list, c.ContractAddress)
 	}
 	c.ContractAddresses = list
 }
 
-// ResolvedContractAddresses returns the list of EVMFS contracts to query
-// for content lookups. Tools should iterate this list in order and use the
-// first match.
+// ResolvedContractAddresses returns EVMFS contracts to query in priority order.
 func (c *Config) ResolvedContractAddresses() []string {
 	if len(c.ContractAddresses) > 0 {
 		return c.ContractAddresses
@@ -90,9 +76,7 @@ func LoadConfig() (*Config, error) {
 		Port:         "8080",
 		CacheDir:     "./cache",
 		RPCURLs:      make(map[string][]string),
-		RewriteHosts: true, // default ON — self-hosted gateways will almost
-		// always want this. Operators can set rewrite_hosts: false in
-		// config.yaml (or REWRITE_HOSTS=false in env) to opt out.
+		RewriteHosts: true,
 	}
 
 	data, err := os.ReadFile("config.yaml")
@@ -102,6 +86,7 @@ func LoadConfig() (*Config, error) {
 		}
 		cfg.applyRewriteDefaults()
 		cfg.applyContractDefaults()
+		cfg.applyNamesDefaults()
 		return cfg, nil
 	}
 
@@ -123,6 +108,9 @@ func LoadConfig() (*Config, error) {
 
 	if namesContract := os.Getenv("NAMES_CONTRACT"); namesContract != "" {
 		cfg.NamesContract = namesContract
+	}
+	if namesContractV2 := os.Getenv("NAMES_CONTRACT_V2"); namesContractV2 != "" {
+		cfg.NamesContractV2 = namesContractV2
 	}
 	if namesChainId := os.Getenv("NAMES_CHAIN_ID"); namesChainId != "" {
 		cfg.NamesChainId = namesChainId

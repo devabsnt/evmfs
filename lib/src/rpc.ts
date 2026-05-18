@@ -61,13 +61,11 @@ export function abiDecodeBytes(hexData: string): Uint8Array {
     throw new Error(`Data too short for ABI decoding: ${data.length} bytes`);
   }
 
-  // First 32 bytes = offset (should be 32)
   const offset = bytesToInt(data.subarray(0, 32));
   if (offset !== 32) {
     throw new Error(`Unexpected ABI offset: ${offset}`);
   }
 
-  // Next 32 bytes = length
   const length = bytesToInt(data.subarray(32, 64));
   if (data.length < 64 + length) {
     throw new Error(`Data truncated: expected ${64 + length} bytes, got ${data.length}`);
@@ -86,7 +84,7 @@ function hexToBytes(hex: string): Uint8Array {
 
 function bytesToInt(bytes: Uint8Array): number {
   let n = 0;
-  // Only read last 6 bytes to avoid overflow for reasonable lengths
+  // Only read last 6 bytes to stay below Number.MAX_SAFE_INTEGER
   const start = Math.max(0, bytes.length - 6);
   for (let i = start; i < bytes.length; i++) {
     n = n * 256 + bytes[i];
@@ -101,7 +99,6 @@ export async function fetchContent(
   contentHash: string,
   blockHint?: number
 ): Promise<Uint8Array> {
-  // Try block hint first
   if (blockHint && blockHint > 0) {
     const from = Math.max(0, blockHint - 1);
     const to = blockHint + 1;
@@ -109,7 +106,7 @@ export async function fetchContent(
     if (data) return data;
   }
 
-  // Fall back to scanning from latest block backward
+  // Scan from latest block backward
   const latestBlock = await getBlockNumber(rpcUrl);
   let toBlock = latestBlock;
 

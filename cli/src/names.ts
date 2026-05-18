@@ -1,17 +1,28 @@
 import { ethers } from "ethers";
 
-const NAMES_ABI = [
+// EVMFSNamesV2: register/update take no block arg (V2 reads it from EVMFSV2 storage).
+// V1: register/update take (name, block, manifest).
+const NAMES_V2_ABI = [
+  "function register(string calldata siteName, bytes32 manifestHash) external payable",
+  "function update(string calldata siteName, bytes32 manifestHash) external",
+  "function lookup(string calldata siteName) external view returns (address owner, uint64 blockNumber, bytes32 manifestHash)",
+];
+
+const NAMES_V1_ABI = [
   "function register(string calldata siteName, uint64 blockNumber, bytes32 manifestHash) external payable",
   "function update(string calldata siteName, uint64 blockNumber, bytes32 manifestHash) external",
   "function lookup(string calldata siteName) external view returns (address owner, uint64 blockNumber, bytes32 manifestHash)",
 ];
+
+export const NAMES_V2_ADDRESS = "0x86342282edF4A1c50249f16f4Cb11C5921455730";
+const NAMES_V1_ADDRESS = "0x36043906ba7c191c9511a60a8b28e3a602ed1477";
 
 const REGISTRATION_FEE = ethers.parseEther("0.001");
 
 interface RegisterOptions {
   name: string;
   manifest: string;
-  block: string;
+  block?: string;
   rpc: string;
   privateKey: string;
   namesContract: string;
@@ -20,10 +31,18 @@ interface RegisterOptions {
 interface UpdateOptions {
   name: string;
   manifest: string;
-  block: string;
+  block?: string;
   rpc: string;
   privateKey: string;
   namesContract: string;
+}
+
+function isV2Names(addr: string): boolean {
+  return addr.toLowerCase() === NAMES_V2_ADDRESS.toLowerCase();
+}
+
+function isV1Names(addr: string): boolean {
+  return addr.toLowerCase() === NAMES_V1_ADDRESS.toLowerCase();
 }
 
 export async function registerCommand(options: RegisterOptions): Promise<void> {
@@ -39,11 +58,22 @@ export async function registerCommand(options: RegisterOptions): Promise<void> {
     process.exit(1);
   }
 
+  const v2 = isV2Names(options.namesContract);
+
+  if (!v2 && !options.block) {
+    console.error("Error: --block is required when registering against the V1 names contract");
+    process.exit(1);
+  }
+
+  if (v2 && options.block) {
+    console.log("Note: --block ignored (V2 reads block from EVMFSV2 storage)\n");
+  }
+
   const provider = new ethers.JsonRpcProvider(options.rpc);
   const wallet = new ethers.Wallet(options.privateKey, provider);
-  const contract = new ethers.Contract(options.namesContract, NAMES_ABI, wallet);
+  const abi = v2 ? NAMES_V2_ABI : NAMES_V1_ABI;
+  const contract = new ethers.Contract(options.namesContract, abi, wallet);
 
-  // Check if name is already taken
   try {
     const [owner] = await contract.lookup(name);
     if (owner !== ethers.ZeroAddress) {
@@ -51,25 +81,25 @@ export async function registerCommand(options: RegisterOptions): Promise<void> {
       process.exit(1);
     }
   } catch {
-    // lookup failed — name is available
+    // lookup failed - name is available
   }
 
-  const block = parseInt(options.block, 10);
-
-  console.log(`Registering ${name}.evmfs.xyz`);
+  console.log(`Registering ${name}.evmfs.xyz (${v2 ? "V2" : "V1"})`);
   console.log(`  Manifest: ${options.manifest}`);
-  console.log(`  Block: ${block}`);
+  if (!v2) console.log(`  Block: ${options.block}`);
   console.log(`  Fee: 0.001 ETH\n`);
 
-  const tx = await contract.register(name, block, options.manifest, {
-    value: REGISTRATION_FEE,
-  });
+  const tx = v2
+    ? await contract.register(name, options.manifest, { value: REGISTRATION_FEE })
+    : await contract.register(name, parseInt(options.block!, 10), options.manifest, {
+        value: REGISTRATION_FEE,
+      });
 
   console.log(`  TX: ${tx.hash}`);
   const receipt = await tx.wait();
 
   if (!receipt || receipt.status === 0) {
-    console.error("Registration failed — transaction reverted");
+    console.error("Registration failed - transaction reverted");
     process.exit(1);
   }
 
@@ -80,24 +110,32 @@ export async function registerCommand(options: RegisterOptions): Promise<void> {
 
 export async function updateNameCommand(options: UpdateOptions): Promise<void> {
   const name = options.name.toLowerCase();
+  const v2 = isV2Names(options.namesContract);
+
+  if (!v2 && !options.block) {
+    console.error("Error: --block is required when updating on the V1 names contract");
+    process.exit(1);
+  }
 
   const provider = new ethers.JsonRpcProvider(options.rpc);
   const wallet = new ethers.Wallet(options.privateKey, provider);
-  const contract = new ethers.Contract(options.namesContract, NAMES_ABI, wallet);
+  const abi = v2 ? NAMES_V2_ABI : NAMES_V1_ABI;
+  const contract = new ethers.Contract(options.namesContract, abi, wallet);
 
-  const block = parseInt(options.block, 10);
-
-  console.log(`Updating ${name}.evmfs.xyz`);
+  console.log(`Updating ${name}.evmfs.xyz (${v2 ? "V2" : "V1"})`);
   console.log(`  New manifest: ${options.manifest}`);
-  console.log(`  Block: ${block}\n`);
+  if (!v2) console.log(`  Block: ${options.block}`);
+  console.log("");
 
-  const tx = await contract.update(name, block, options.manifest);
+  const tx = v2
+    ? await contract.update(name, options.manifest)
+    : await contract.update(name, parseInt(options.block!, 10), options.manifest);
 
   console.log(`  TX: ${tx.hash}`);
   const receipt = await tx.wait();
 
   if (!receipt || receipt.status === 0) {
-    console.error("Update failed — transaction reverted");
+    console.error("Update failed - transaction reverted");
     process.exit(1);
   }
 

@@ -9,7 +9,7 @@ async function loadKeccak256(): Promise<void> {
     const mod = await import("@noble/hashes/sha3");
     keccak256fn = mod.keccak_256;
   } catch {
-    // @noble/hashes not installed — verification disabled
+    // @noble/hashes not installed - verification disabled
   }
 }
 
@@ -26,9 +26,9 @@ export async function verifyHash(data: Uint8Array, expectedHash: string): Promis
   if (!keccak256fn) {
     if (!warned) {
       warned = true;
-      console.warn("[evmfs] @noble/hashes not installed — hash verification disabled. Install it for content integrity checks.");
+      console.warn("[evmfs] @noble/hashes not installed - hash verification disabled. Install it for content integrity checks.");
     }
-    return null; // cannot verify
+    return null;
   }
   const actual = bytesToHex(keccak256fn(data));
   return actual === expectedHash.toLowerCase();

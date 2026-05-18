@@ -103,7 +103,7 @@ export function loadProgress(): SavedProgress | null {
       clearProgress();
       return null;
     }
-    // Migrate legacy format (index-only, no chunking)
+    // Migrate legacy format (index-only, pre-chunking)
     const migrated: ConfirmedUnit[] = p.confirmed.map((c) => {
       if ("fileIndex" in c) return c;
       const legacy = c as { index: number; hash: string; block: number };
@@ -456,9 +456,7 @@ export async function uploadFiles(
   clearProgress();
   console.log(`[evmfs] upload complete! manifest: ${manifestHash}, block: ${manifestBlock}`);
 
-  // Auto-register in EVMFSBlockIndex so future readers can fetch by hash
-  // alone (no log scan). Best-effort — upload is already complete. Skipped
-  // when uploading to V2 (V2 records uploader+block in its own storage).
+  // Skipped for V2 (records uploader+block in its own storage). Best-effort.
   const indexAddrViem = BLOCK_INDEX_BY_CHAIN[String(chainId)];
   const isV2Upload = contractAddress.toLowerCase() === EVMFS_V2_FOR_REG.toLowerCase();
   if (indexAddrViem && !isV2Upload) {
@@ -670,9 +668,7 @@ export async function uploadFilesWithPrivateKey(
   clearProgress();
   console.log(`[evmfs] upload complete! manifest: ${manifestHash}, block: ${manifestBlock}`);
 
-  // Auto-register in EVMFSBlockIndex so future readers can fetch by hash
-  // alone (no log scan). Best-effort — upload is already complete. Skipped
-  // when uploading to V2 (V2 records uploader+block in its own storage).
+  // Skipped for V2 (records uploader+block in its own storage). Best-effort.
   const indexAddrEthers = BLOCK_INDEX_BY_CHAIN[String(chainId)];
   const isV2UploadE = contractAddress.toLowerCase() === EVMFS_V2_FOR_REG.toLowerCase();
   if (indexAddrEthers && contract.runner && !isV2UploadE) {
@@ -701,16 +697,12 @@ export async function uploadFilesWithPrivateKey(
   return { manifestHash, confirmed: confirmedList };
 }
 
-// ---------- EVMFSBlockIndex auto-registration ----------
-// Per-chain BlockIndex addresses. Extend as new chains are added.
-
 const BLOCK_INDEX_BY_CHAIN: Record<string, string> = {
   "1":   "0x85fce8503683a76371568f2f1347cf2c85dddc39", // Ethereum mainnet
   "143": "0x2b62d34557e7cb8cb31dc83d2132396d0ef5cad0", // Monad mainnet
 };
 
-// V2 contract address. When the upload target is V2, BlockIndex registration
-// is redundant — V2 records uploader + block in its own storage.
+// V2 records uploader + block in its own storage, so BlockIndex is redundant.
 const EVMFS_V2_FOR_REG = "0xb61cdCDC81d97c32122E668AE782b2327d0a623C";
 
 const BLOCK_INDEX_ABI_VIEM = [

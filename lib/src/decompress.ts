@@ -1,5 +1,4 @@
 export async function gunzip(data: Uint8Array): Promise<Uint8Array> {
-  // Browser: use DecompressionStream API
   if (typeof DecompressionStream !== "undefined") {
     const ds = new DecompressionStream("gzip");
     const writer = ds.writable.getWriter();
@@ -23,7 +22,6 @@ export async function gunzip(data: Uint8Array): Promise<Uint8Array> {
     return result;
   }
 
-  // Node.js: use built-in zlib
   const { gunzipSync } = await import("node:zlib");
   return new Uint8Array(gunzipSync(data));
 }

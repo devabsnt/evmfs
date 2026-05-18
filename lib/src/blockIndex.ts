@@ -1,13 +1,20 @@
-// Helpers for reading EVMFSBlockIndex — the on-chain (hash → block) cache.
-// Used by EVMFS.manifest() / EVMFS.fetch() when a block hint isn't supplied,
-// to avoid an expensive log scan.
+// Reads EVMFSBlockIndex (on-chain hash -> block cache) to skip log scans.
 
-// keccak256("blockOf(bytes32)") first 4 bytes
+// keccak256("blockOf(bytes32)") first 4 bytes. Same selector on
+// EVMFSV2 and EVMFSBlockIndex, so the call below works against either.
 const BLOCK_OF_SELECTOR = "0x7ee64074";
 
-// Per-chain default BlockIndex contract addresses. Extend as the contract
-// is deployed to additional chains.
+// EVMFSV2 - same address on every chain via CREATE2. Its blockOf(bytes32)
+// returns the manifest's block directly, no sidecar needed.
+export const EVMFS_V2_ADDRESS = "0xb61cdCDC81d97c32122E668AE782b2327d0a623C";
+
+export function isV2Contract(addr: string | undefined): boolean {
+  if (!addr) return false;
+  return addr.toLowerCase() === EVMFS_V2_ADDRESS.toLowerCase();
+}
+
 const DEFAULT_BLOCK_INDEX: Record<number, string> = {
+  1:   "0x85fce8503683a76371568f2f1347cf2c85dddc39", // Ethereum mainnet
   143: "0x2b62d34557e7cb8cb31dc83d2132396d0ef5cad0", // Monad mainnet
 };
 
@@ -16,11 +23,7 @@ export function defaultBlockIndex(chainId: number | undefined): string | undefin
   return DEFAULT_BLOCK_INDEX[chainId];
 }
 
-/**
- * Read the registered block for a manifest hash from a BlockIndex contract.
- * Returns 0 if the hash isn't registered (caller should fall back to a scan).
- * Returns 0 on any RPC / decode error (also fall back).
- */
+/** Returns the registered block for a hash, or 0 if unregistered/RPC error (caller falls back to scan). */
 export async function lookupBlock(
   rpcUrl: string,
   blockIndexAddress: string,

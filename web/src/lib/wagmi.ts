@@ -17,26 +17,21 @@ const connectors = connectorsForWallets(
   }
 );
 
-// V1 contract — original EVMFS, no block tracking. Same address on every chain via CREATE2.
+// V1: no block tracking. Same address on every chain via CREATE2.
 export const EVMFS_V1: Hex = "0x140cbDFf649929D003091a5B8B3be34588753aBA";
 
-// V2 contract — adds (uploader, blockNumber) recording in storeManifest.
-// Same address on every chain via CREATE2 (Safe Singleton Factory).
+// V2: records (uploader, blockNumber) in storeManifest. Same address per chain via CREATE2.
 export const EVMFS_V2: Hex = "0xb61cdCDC81d97c32122E668AE782b2327d0a623C";
 
-// Default contract used by the upload UI. V2 is the recommended default for
-// new uploads; a UI toggle lets users opt back to V1 if they need to.
 export const EVMFS_CONTRACT: Hex = EVMFS_V2;
 
-// Contract version identifier used by upload state machinery + UI toggle.
 export type EvmfsVersion = "v1" | "v2";
 
 export function evmfsAddressFor(version: EvmfsVersion): Hex {
   return version === "v2" ? EVMFS_V2 : EVMFS_V1;
 }
 
-// EVMFSBlockIndex addresses per chain (sidecar for V1 hash → block lookups).
-// Not deployed via CREATE2, so addresses vary per chain.
+// Sidecar for V1 hash -> block lookups. Not CREATE2-deployed, so addresses vary per chain.
 export const EVMFS_BLOCK_INDEX: Record<number, Hex> = {
   1: "0x85fce8503683a76371568f2f1347cf2c85dddc39",   // Ethereum mainnet
   143: "0x2b62d34557e7cb8cb31dc83d2132396d0ef5cad0", // Monad mainnet

@@ -21,7 +21,7 @@ const userSections = [
 ];
 
 const devSections = [
-  "Contract address",
+  "Contract addresses",
   "URL format",
   "Manifest format",
   "Large files (multi-part entries)",
@@ -275,10 +275,10 @@ function DevsDocs({ chainName }: { chainName: string }) {
         </p>
         <CodeBlock>{`0xb61cdCDC81d97c32122E668AE782b2327d0a623C`}</CodeBlock>
         <p style={{ margin: "10px 0 0" }}>
-          Deployed on Ethereum mainnet (chain ID <Code>1</Code>) and Monad mainnet (chain ID <Code>143</Code>) at the same address via CREATE2. <code>storeManifest()</code> records both the uploader and the block number in contract storage, so future readers can fetch by hash alone — no log scan required.
+          Deployed on Ethereum mainnet (chain ID <Code>1</Code>) and Monad mainnet (chain ID <Code>143</Code>) at the same address via CREATE2. <code>storeManifest()</code> records both the uploader and the block number in contract storage, so future readers can fetch by hash alone -no log scan required.
         </p>
         <p style={{ margin: "16px 0 8px", color: "#a0a0aa" }}>
-          <strong style={{ color: "#e0e0e0" }}>EVMFS V1</strong> (legacy — same Store event signature)
+          <strong style={{ color: "#e0e0e0" }}>EVMFS V1</strong> (legacy -same Store event signature)
         </p>
         <CodeBlock>{`0x140cbDFf649929D003091a5B8B3be34588753aBA`}</CodeBlock>
         <p style={{ margin: "10px 0 0" }}>
@@ -365,8 +365,9 @@ mapping(bytes32 => address) public manifests;`}</CodeBlock>
 const provider = new ethers.JsonRpcProvider(rpcUrl);
 const topic = ethers.id("Store(bytes32,bytes)");
 
+// V2 address. Use 0x140cbDFf649929D003091a5B8B3be34588753aBA for V1 content.
 const logs = await provider.getLogs({
-  address: "0x140cbDFf649929D003091a5B8B3be34588753aBA",
+  address: "0xb61cdCDC81d97c32122E668AE782b2327d0a623C",
   topics: [topic, contentHash],
   fromBlock: knownBlock,
   toBlock: knownBlock,
@@ -383,23 +384,40 @@ const bytes = ethers.getBytes(raw);
         <CodeBlock>{`docker build -t evmfs-gateway github.com/devabsnt/evmfs#main:gateway
 
 docker run -p 8080:8080 \\
-  -e CONTRACT_ADDRESS=0x140cbDFf649929D003091a5B8B3be34588753aBA \\
   -e RPC_URLS="1=https://eth.llamarpc.com;143=https://rpc.monad.xyz" \\
   evmfs-gateway`}</CodeBlock>
+        <p style={{ margin: "10px 0 0" }}>
+          The gateway queries V2 first and falls back to V1 automatically - no contract address needed for default setups. Set <Code>CONTRACT_ADDRESSES=0x...,0x...</Code> to override the V2+V1 list (e.g. for a custom contract).
+        </p>
       </Section>
 
       <Section title="EVMFS Names contract">
-        On-chain subdomain registry. Register <Code>yourname.evmfs.xyz</Code> for 0.001 ETH - no renewals, names are ERC-721 NFTs.
-        <CodeBlock>{`// EVMFSNames - Ethereum mainnet
+        On-chain subdomain registry. Register <Code>yourname.evmfs.xyz</Code> for 0.001 ETH - no renewals, names are ERC-721 NFTs. Two contracts coexist; gateways query V2 first, fall back to V1.
+        <p style={{ margin: "16px 0 8px", color: "#a0a0aa" }}>
+          <strong style={{ color: "#e0e0e0" }}>EVMFSNamesV2</strong> (current - registers names against V2 manifests)
+        </p>
+        <CodeBlock>{`// Ethereum mainnet
+0x86342282edF4A1c50249f16f4Cb11C5921455730
+
+function register(string name, bytes32 manifest) payable
+function update(string name, bytes32 manifest)
+function lookup(string name) view returns (address, uint64, bytes32)
+
+// Caller must have uploaded the V2 manifest (uploaderOf check).
+// Block number is read directly from EVMFSV2 storage - no block arg.
+// Anti-squat: if the same name exists on V1 owned by someone else,
+// register reverts. V1 owners can register their name on V2 (upgrade).`}</CodeBlock>
+        <p style={{ margin: "16px 0 8px", color: "#a0a0aa" }}>
+          <strong style={{ color: "#e0e0e0" }}>EVMFSNames V1</strong> (legacy - still used by names.evmfs.xyz UI and CLI)
+        </p>
+        <CodeBlock>{`// Ethereum mainnet
 0x36043906ba7c191c9511a60a8b28e3a602ed1477
 
-// ABI (key functions)
 function register(string name, uint64 block, bytes32 manifest) payable
 function update(string name, uint64 block, bytes32 manifest)
 function lookup(string name) view returns (address, uint64, bytes32)
 
-// Only the manifest uploader can register a name for it.
-// Name owner can update the manifest at any time.
+// Names registered here continue to resolve through every gateway.
 // Standard ERC-721 - transferFrom, safeTransferFrom, etc.`}</CodeBlock>
       </Section>
 
@@ -443,15 +461,13 @@ git clone https://github.com/devabsnt/evmfs
 cd evmfs/gateway
 go build -o evmfs-gateway .
 
-# Run
-CONTRACT_ADDRESS=0x140cbDFf649929D003091a5B8B3be34588753aBA \\
+# Run - V2+V1 are queried automatically, no contract address needed
 RPC_URLS="1=https://eth.llamarpc.com;143=https://rpc.monad.xyz" \\
 ./evmfs-gateway
 
 # Or with Docker
 docker build -t evmfs-gateway .
 docker run -p 8080:8080 \\
-  -e CONTRACT_ADDRESS=0x140cbDFf649929D003091a5B8B3be34588753aBA \\
   -e RPC_URLS="1=https://eth.llamarpc.com;143=https://rpc.monad.xyz" \\
   evmfs-gateway`}</CodeBlock>
         <p style={{ margin: "12px 0 0" }}>
@@ -461,9 +477,13 @@ docker run -p 8080:8080 \\
           To enable subdomain resolution, add these env vars and a wildcard DNS record:
         </p>
         <CodeBlock>{`# Gateway env vars
-NAMES_CONTRACT=0x36043906ba7c191c9511a60a8b28e3a602ed1477
+NAMES_CONTRACT=0x36043906ba7c191c9511a60a8b28e3a602ed1477   # V1
 NAMES_CHAIN_ID=1
 GATEWAY_DOMAIN=yourdomain.com
+
+# Optional - V2 names. Defaults to canonical V2 address when NAMES_CONTRACT
+# is set, so this is only needed to override.
+# NAMES_CONTRACT_V2=0x86342282edF4A1c50249f16f4Cb11C5921455730
 
 # DNS - add a wildcard CNAME pointing to your gateway
 *   CNAME   your-gateway-host.example.com`}</CodeBlock>
