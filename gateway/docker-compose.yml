@@ -1,0 +1,60 @@
+# EVMFS Gateway — turnkey docker-compose setup.
+#
+# 1. Edit the env vars below to match your domain + chosen RPC endpoints.
+# 2. Edit `Caddyfile` to use your domain (or just leave it as-is for HTTP-only).
+# 3. `docker compose up -d --build`
+# 4. Point your DNS at this host.
+#
+# The Caddy service in front handles automatic HTTPS via Let's Encrypt
+# when given a real domain. If you're not using HTTPS, you can remove
+# the caddy service entirely and just expose the gateway on port 8080.
+
+services:
+  gateway:
+    build: .
+    restart: unless-stopped
+    environment:
+      # Same on every chain via CREATE2. Don't change unless you have a
+      # very specific reason.
+      CONTRACT_ADDRESS: "0x140cbDFf649929D003091a5B8B3be34588753aBA"
+
+      # Where the gateway listens. Caddy proxies to this internally.
+      PORT: "8080"
+
+      # RPC endpoints. Use the form `<chainId>=<url1>,<url2>; <chainId>=...`.
+      # Multiple endpoints per chain are used for failover.
+      RPC_URLS: >-
+        1=https://ethereum-rpc.publicnode.com,https://eth.llamarpc.com;
+        11155111=https://ethereum-sepolia-rpc.publicnode.com;
+        143=https://rpc.monad.xyz,https://rpc1.monad.xyz,https://rpc2.monad.xyz
+
+      # URL rewriter — ON by default. Set to "false" to disable.
+      REWRITE_HOSTS: "true"
+      REWRITE_FROM_HOSTS: "evmfs.xyz,www.evmfs.xyz"
+
+      # Optional: serve EVMFS-Names subdomains. Uncomment to enable.
+      # NAMES_CONTRACT: "0x36043906ba7c191c9511a60a8b28e3a602ed1477"
+      # NAMES_CHAIN_ID: "1"
+      # GATEWAY_DOMAIN: "yourgateway.com"
+    volumes:
+      - gateway_cache:/app/cache
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - gateway
+
+volumes:
+  gateway_cache:
+  caddy_data:
+  caddy_config:

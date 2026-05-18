@@ -78,6 +78,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodGet && urlPath == "/health":
 		s.handleHealth(w, r)
 
+	case r.Method == http.MethodGet && urlPath == "/resolve":
+		s.handleResolve(w, r)
+
 	case r.Method == http.MethodGet && len(segments) >= 4 && isChainId(segments[0]) && isBlockNumber(segments[1]) && contentHashRegex.MatchString(segments[2]):
 		blockNum, _ := strconv.ParseInt(segments[1], 10, 64)
 		pathOrIndex := strings.Join(segments[3:], "/")
@@ -89,14 +92,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	case r.Method == http.MethodGet && len(segments) == 3 && isChainId(segments[0]) && isBlockNumber(segments[1]) && contentHashRegex.MatchString(segments[2]):
 		blockNum, _ := strconv.ParseInt(segments[1], 10, 64)
-		s.handleFile(w, segments[0], segments[2], blockNum)
+		s.handleFile(w, r, segments[0], segments[2], blockNum)
 
 	case r.Method == http.MethodGet && len(segments) >= 3 && isChainId(segments[0]) && contentHashRegex.MatchString(segments[1]):
 		pathOrIndex := strings.Join(segments[2:], "/")
 		s.handleManifestOrFile(w, r, segments[0], segments[1], pathOrIndex, 0)
 
 	case r.Method == http.MethodGet && len(segments) == 2 && isChainId(segments[0]) && contentHashRegex.MatchString(segments[1]):
-		s.handleFile(w, segments[0], segments[1], 0)
+		s.handleFile(w, r, segments[0], segments[1], 0)
 
 	default:
 		if s.hasStatic {
@@ -112,7 +115,56 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("ok"))
 }
 
-func (s *Server) handleFile(w http.ResponseWriter, chainId, contentHash string, blockHint int64) {
+// handleResolve accepts a full EVMFS URL via ?url=... and dispatches it
+// through the normal router. Useful for programmatic callers (browser
+// extensions, CLI fallbacks, custom proxies) that want to resolve a URL
+// regardless of which host it points to. Examples:
+//
+//	GET /resolve?url=https://evmfs.xyz/143/71117086/0x764b.../1.png
+//	GET /resolve?url=/143/71117086/0x764b.../1.png
+//	GET /resolve?url=https://other.gateway.com/1/24833445/0x4b0c.../index.html
+//
+// We strip the scheme + host (if present) and re-route on the path portion.
+// Query/fragment are dropped — they're not part of the EVMFS URL grammar.
+func (s *Server) handleResolve(w http.ResponseWriter, r *http.Request) {
+	u := r.URL.Query().Get("url")
+	if u == "" {
+		http.Error(w, "missing ?url=... parameter", http.StatusBadRequest)
+		return
+	}
+
+	// Strip scheme + host. Keep only the path.
+	path := u
+	if i := strings.Index(path, "://"); i >= 0 {
+		path = path[i+3:]
+		if j := strings.Index(path, "/"); j >= 0 {
+			path = path[j:]
+		} else {
+			path = "/"
+		}
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	// Drop query + fragment from the inner URL — they're not part of the
+	// canonical EVMFS path grammar.
+	if i := strings.IndexAny(path, "?#"); i >= 0 {
+		path = path[:i]
+	}
+
+	// Re-dispatch with the rewritten path. We clone the request so the
+	// inner handlers see a clean URL.
+	clone := r.Clone(r.Context())
+	newURL := *r.URL
+	newURL.Path = path
+	newURL.RawPath = ""
+	newURL.RawQuery = ""
+	clone.URL = &newURL
+	clone.RequestURI = path
+	s.ServeHTTP(w, clone)
+}
+
+func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, chainId, contentHash string, blockHint int64) {
 	if !contentHashRegex.MatchString(contentHash) {
 		http.Error(w, "invalid content hash: must be 0x + 64 hex characters", http.StatusBadRequest)
 		return
@@ -126,7 +178,7 @@ func (s *Server) handleFile(w http.ResponseWriter, chainId, contentHash string, 
 	}
 
 	contentType := DetectContentType(data)
-	s.serveContent(w, data, contentType)
+	s.serveContent(w, r, data, contentType)
 }
 
 type manifestEntry struct {
@@ -297,7 +349,7 @@ func (s *Server) handleManifestOrFile(w http.ResponseWriter, r *http.Request, ch
 	if contentType == "" {
 		contentType = DetectContentType(data)
 	}
-	s.serveContent(w, data, contentType)
+	s.serveContent(w, r, data, contentType)
 }
 
 func (s *Server) handleNamedSite(w http.ResponseWriter, r *http.Request, name string) {
@@ -560,9 +612,30 @@ func gunzip(data []byte) ([]byte, error) {
 	return io.ReadAll(reader)
 }
 
-func (s *Server) serveContent(w http.ResponseWriter, data []byte, contentType string) {
+func (s *Server) serveContent(w http.ResponseWriter, r *http.Request, data []byte, contentType string) {
+	// URL host rewriting: scan text-based responses for hardcoded references
+	// to other gateways (typically evmfs.xyz) and replace them with the
+	// current request's host. Lets collection owners migrate gateways
+	// with a single setBaseURI() — metadata files don't have to be
+	// re-uploaded. See rewriter.go for full details.
+	if s.Config.RewriteHosts {
+		if rewritten, ok := rewriteURLs(data, contentType, r, s.Config.RewriteFromHosts); ok {
+			data = rewritten
+			w.Header().Set("X-EVMFS-Rewritten",
+				"from="+strings.Join(s.Config.RewriteFromHosts, ",")+"; to="+r.Host)
+			// Rewritten responses no longer match the immutable on-chain
+			// bytes byte-for-byte (their hash would differ). Treat them
+			// as cacheable but shorter-lived so a misconfiguration can be
+			// rolled back faster than the year-long immutable cache.
+			w.Header().Set("Cache-Control", "public, max-age=3600")
+		} else {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
+	} else {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	}
+
 	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(http.StatusOK)
 	w.Write(data)

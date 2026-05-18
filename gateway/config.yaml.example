@@ -1,9 +1,63 @@
+# EVMFS Gateway configuration.
+# Copy this to config.yaml and edit the values you care about. Everything
+# here can also be overridden via environment variables (see README.md).
+
+# HTTP port the gateway listens on.
 port: "8080"
+
+# Local cache directory for fetched chain content. Persistent across restarts.
 cache_dir: "./cache"
-contract_address: "0xYourContractAddressHere"
+
+# The canonical EVMFS contract address. Same on every chain via CREATE2.
+contract_address: "0x140cbDFf649929D003091a5B8B3be34588753aBA"
+
+# RPC URLs per chain ID. Multiple URLs per chain are used for failover.
+# Use public endpoints, your own node, or paid providers — the gateway
+# doesn't care as long as they support eth_getLogs.
 rpc_urls:
   "1":
-    - "https://mainnet.infura.io/v3/YOUR_INFURA_KEY"
+    - "https://ethereum-rpc.publicnode.com"
+    - "https://eth.llamarpc.com"
+    - "https://rpc.ankr.com/eth"
   "11155111":
-    - "https://sepolia.infura.io/v3/YOUR_INFURA_KEY"
-    - "https://rpc.sepolia.org"
+    - "https://ethereum-sepolia-rpc.publicnode.com"
+    - "https://sepolia.drpc.org"
+  "143":
+    - "https://rpc.monad.xyz"
+    - "https://rpc1.monad.xyz"
+    - "https://rpc2.monad.xyz"
+    - "https://rpc-mainnet.monadinfra.com"
+    - "https://monad-mainnet.drpc.org"
+
+# ─── URL host rewriting ──────────────────────────────────────────────────
+# When enabled, the gateway scans served text content (JSON, HTML, CSS,
+# JS, SVG, XML) for references to any host in `rewrite_from_hosts` and
+# replaces them with the request's own host (matching the current scheme).
+#
+# What this is for: NFT metadata stored on EVMFS often contains hardcoded
+# image URLs pointing at evmfs.xyz. If you self-host the gateway and
+# point a collection's baseURI at it, the served metadata will still
+# reference evmfs.xyz unless this rewriter normalizes it. With this
+# enabled, a collection migrates with a single `setBaseURI()` transaction
+# — no metadata re-upload required.
+#
+# Defaults: ON, with evmfs.xyz + www.evmfs.xyz as the source hosts.
+rewrite_hosts: true
+rewrite_from_hosts:
+  - "evmfs.xyz"
+  - "www.evmfs.xyz"
+
+# ─── Optional: subdomain name-resolution mode ────────────────────────────
+# If you also want this gateway to serve EVMFS-Names subdomains (e.g.
+# `mysite.yourgateway.com`), configure these. Leave commented out
+# otherwise.
+#
+# names_contract: "0x36043906ba7c191c9511a60a8b28e3a602ed1477"
+# names_chain_id: "1"
+# gateway_domain: "yourgateway.com"
+
+# ─── Optional: serve a static frontend ───────────────────────────────────
+# If you want / on the gateway to serve a static landing page (e.g. an
+# upload UI), point this at its build directory.
+#
+# static_dir: "../web/dist"

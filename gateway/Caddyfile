@@ -1,0 +1,31 @@
+# EVMFS Gateway — Caddy reverse-proxy config.
+#
+# Caddy gives you automatic HTTPS via Let's Encrypt when you specify a
+# real domain. Replace yourgateway.com below with your actual domain.
+# Caddy will also handle the HTTP -> HTTPS redirect automatically.
+#
+# If you're running locally for testing without TLS, use the bottom
+# section instead and remove the production block above.
+
+# ─── production (real domain, automatic HTTPS) ──────────────────────────
+yourgateway.com {
+    reverse_proxy gateway:8080 {
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-For   {remote_host}
+        header_up Host              {host}
+    }
+
+    # Long-lived cache for content-addressed responses. The gateway
+    # itself sets immutable Cache-Control on non-rewritten content;
+    # this just lets the proxy honor it.
+    encode gzip zstd
+}
+
+# ─── local development (HTTP only, no TLS) ──────────────────────────────
+# Uncomment if running on localhost without a real domain.
+#
+# :80 {
+#     reverse_proxy gateway:8080 {
+#         header_up X-Forwarded-Proto {scheme}
+#     }
+# }
