@@ -410,6 +410,17 @@ func (s *Server) handleDirectory(w http.ResponseWriter, r *http.Request, chainId
 		return
 	}
 
+	// If the manifest contains an index.html and the caller didn't ask for
+	// the JSON listing, serve index.html. A trailing-slash URL on a
+	// site-style manifest should load the site, not the file listing.
+	// Mirrors handleNamedRoot's behavior.
+	if r.URL.Query().Get("format") != "json" {
+		if idx := findByFilename(entries, "index.html"); idx >= 0 {
+			s.handleManifestOrFile(w, r, chainId, manifestHash, "index.html", blockHint)
+			return
+		}
+	}
+
 	if r.URL.Query().Get("format") == "json" {
 		type jsonPart struct {
 			Hash  string `json:"hash"`
