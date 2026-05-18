@@ -748,7 +748,7 @@ export default function App() {
           <a href="https://names.evmfs.xyz" style={{ color: "#a0a0aa", textDecoration: "underline", textUnderlineOffset: "3px" }}>names.evmfs.xyz</a>
           {" "}&middot;{" "}
           <a
-            href="https://evmfs.xyz/1/25122671/0xf467b60f9b32dd6da2b538ed98899691b1da5b5678b32abf33c4be710128d46f/"
+            href="https://evmfs.xyz/1/25122805/0xdfbe7920e8564928ae65bc4ce7fecaed3ecadf41b6f3de65ca821f49f8eba374/"
             target="_blank"
             rel="noopener noreferrer"
             style={{ color: "#a0a0aa", textDecoration: "underline", textUnderlineOffset: "3px" }}
