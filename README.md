@@ -12,11 +12,13 @@ It was designed primarily to make NFT metadata cheap to store fully on-chain; im
 
 ## What EVMFS actually is
 
-A 31-line Solidity contract that emits events containing your (gzipped) file bytes. LOG opcodes cost ~8 gas per byte: roughly **2,500× cheaper than SSTORE** for bulk data. Files are content-addressed via keccak256 hash. A manifest transaction binds N files into a single hash, producing a URI that drops straight into an ERC-721 `baseURI()`:
+A small immutable Solidity contract that emits events containing your (gzipped) file bytes. LOG opcodes cost ~8 gas per byte: roughly **2,500× cheaper than SSTORE** for bulk data. Files are content-addressed via keccak256 hash. A manifest transaction binds N files into a single hash, producing a URI that drops straight into an ERC-721 `baseURI()`:
 
 ```
 https://evmfs.xyz/{chainId}/{manifestBlock}/{manifestHash}/
 ```
+
+The current recommended contract is **V2** (`0xb61cdCDC81d97c32122E668AE782b2327d0a623C`). V2 records the upload block alongside the uploader in contract storage, so consumers can fetch by hash alone with no log scan. The original V1 contract (`0x140cbDFf649929D003091a5B8B3be34588753aBA`) is still supported for backwards compatibility; tooling reads from both transparently. Both deploy at the same address on every chain via CREATE2.
 
 Nothing novel in the underlying mechanic. What's different is that the upload tooling, gateway, web UI and manifest format already exist and work - so you can actually use this primitive without writing 2,000 lines of glue code yourself.
 
@@ -245,12 +247,33 @@ Those values unlock everything you uploaded, forever.
 
 ## Deployment
 
-### EVMFS (storage)
-- **Ethereum mainnet** (chain ID `1`): `0x140cbDFf649929D003091a5B8B3be34588753aBA`
-- **Sepolia** (chain ID `11155111`): `0x443E0EFed7Ca889e31f65b3a262999C88a1D470F`
+### EVMFSV2 (current, recommended)
+
+Records both the uploader address and the block number on `storeManifest`. Fetch by hash alone is a single contract read, no scan required.
+
+- **Ethereum mainnet** (chain ID `1`): `0xb61cdCDC81d97c32122E668AE782b2327d0a623C`
+- **Monad mainnet** (chain ID `143`): `0xb61cdCDC81d97c32122E668AE782b2327d0a623C`
+
+Same address on every chain via CREATE2 deployment through the Safe Singleton Factory.
 
 ### EVMFSNames (subdomain registry)
+
 - **Ethereum mainnet** (chain ID `1`): `0x36043906ba7c191c9511a60a8b28e3a602ed1477`
+
+### EVMFSBlockIndex (sidecar for V1 content)
+
+Permissionless mapping of V1 manifest hashes to block numbers. Only the original uploader can register. Lets V1 content also support hash-only lookups without re-uploading.
+
+- **Ethereum mainnet** (chain ID `1`): `0x85fce8503683a76371568f2f1347cf2c85dddc39`
+- **Monad mainnet** (chain ID `143`): `0x2b62d34557e7cb8cb31dc83d2132396d0ef5cad0`
+
+### EVMFS V1 (legacy, still supported)
+
+The original contract. Same `Store` event signature as V2 so every reader handles both transparently. New uploads should use V2; V1 stays operational so existing collections do not break.
+
+- **Ethereum mainnet** (chain ID `1`): `0x140cbDFf649929D003091a5B8B3be34588753aBA`
+- **Sepolia** (chain ID `11155111`): `0x443E0EFed7Ca889e31f65b3a262999C88a1D470F`
+- **Monad mainnet** (chain ID `143`): `0x140cbDFf649929D003091a5B8B3be34588753aBA`
 
 ---
 

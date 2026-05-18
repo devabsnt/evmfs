@@ -455,6 +455,33 @@ export async function uploadFiles(
 
   clearProgress();
   console.log(`[evmfs] upload complete! manifest: ${manifestHash}, block: ${manifestBlock}`);
+
+  // Auto-register in EVMFSBlockIndex so future readers can fetch by hash
+  // alone (no log scan). Best-effort — upload is already complete. Skipped
+  // when uploading to V2 (V2 records uploader+block in its own storage).
+  const indexAddrViem = BLOCK_INDEX_BY_CHAIN[String(chainId)];
+  const isV2Upload = contractAddress.toLowerCase() === EVMFS_V2_FOR_REG.toLowerCase();
+  if (indexAddrViem && !isV2Upload) {
+    try {
+      const idxData = encodeFunctionData({
+        abi: BLOCK_INDEX_ABI_VIEM,
+        functionName: "register",
+        args: [manifestHash as `0x${string}`, BigInt(manifestBlock)],
+      });
+      const idxTxHash = await walletClient.sendTransaction({
+        to: indexAddrViem as `0x${string}`,
+        data: idxData,
+        account, chain: walletClient.chain,
+      });
+      console.log(`[evmfs] block index TX: ${idxTxHash}`);
+      const idxReceipt = await publicClient.waitForTransactionReceipt({ hash: idxTxHash, timeout: RECEIPT_TIMEOUT });
+      if (idxReceipt.status === "reverted") throw new Error(`block index reverted (tx ${idxTxHash})`);
+      console.log(`[evmfs] block index: registered ${manifestHash.slice(0, 10)}… → block ${manifestBlock}`);
+    } catch (err) {
+      console.warn(`[evmfs] block index registration failed (upload still succeeded):`, err);
+    }
+  }
+
   const baseUri = `${gatewayUrl}/${chainId}/${manifestBlock}/${manifestHash}/`;
   callbacks.onComplete(manifestHash, baseUri, manifestJson, totalGasUsed);
 
@@ -642,8 +669,57 @@ export async function uploadFilesWithPrivateKey(
 
   clearProgress();
   console.log(`[evmfs] upload complete! manifest: ${manifestHash}, block: ${manifestBlock}`);
+
+  // Auto-register in EVMFSBlockIndex so future readers can fetch by hash
+  // alone (no log scan). Best-effort — upload is already complete. Skipped
+  // when uploading to V2 (V2 records uploader+block in its own storage).
+  const indexAddrEthers = BLOCK_INDEX_BY_CHAIN[String(chainId)];
+  const isV2UploadE = contractAddress.toLowerCase() === EVMFS_V2_FOR_REG.toLowerCase();
+  if (indexAddrEthers && contract.runner && !isV2UploadE) {
+    try {
+      const idx = new ethers.Contract(
+        indexAddrEthers,
+        ["function register(bytes32 hash, uint64 blockNumber) external"],
+        contract.runner,
+      );
+      const idxTx = await idx.register(manifestHash, BigInt(manifestBlock), {
+        nonce: nonce + 1,
+        maxFeePerGas: feeData.maxFeePerGas,
+        maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
+      });
+      console.log(`[evmfs] block index TX: ${idxTx.hash}`);
+      await idxTx.wait(1, RECEIPT_TIMEOUT);
+      console.log(`[evmfs] block index: registered ${manifestHash.slice(0, 10)}… → block ${manifestBlock}`);
+    } catch (err) {
+      console.warn(`[evmfs] block index registration failed (upload still succeeded):`, err);
+    }
+  }
+
   const baseUri = `${gatewayUrl}/${chainId}/${manifestBlock}/${manifestHash}/`;
   callbacks.onComplete(manifestHash, baseUri, manifestJson, totalGasUsed);
 
   return { manifestHash, confirmed: confirmedList };
 }
+
+// ---------- EVMFSBlockIndex auto-registration ----------
+// Per-chain BlockIndex addresses. Extend as new chains are added.
+
+const BLOCK_INDEX_BY_CHAIN: Record<string, string> = {
+  "1":   "0x85fce8503683a76371568f2f1347cf2c85dddc39", // Ethereum mainnet
+  "143": "0x2b62d34557e7cb8cb31dc83d2132396d0ef5cad0", // Monad mainnet
+};
+
+// V2 contract address. When the upload target is V2, BlockIndex registration
+// is redundant — V2 records uploader + block in its own storage.
+const EVMFS_V2_FOR_REG = "0xb61cdCDC81d97c32122E668AE782b2327d0a623C";
+
+const BLOCK_INDEX_ABI_VIEM = [
+  {
+    type: "function", name: "register", stateMutability: "nonpayable",
+    inputs: [
+      { name: "hash", type: "bytes32" },
+      { name: "blockNumber", type: "uint64" },
+    ],
+    outputs: [],
+  },
+] as const;

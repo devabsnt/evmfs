@@ -746,6 +746,16 @@ export default function App() {
         <p style={{ color: "#606068", fontSize: 12, margin: 0 }}>
           EVMFS is open source &middot;{" "}
           <a href="https://names.evmfs.xyz" style={{ color: "#a0a0aa", textDecoration: "underline", textUnderlineOffset: "3px" }}>names.evmfs.xyz</a>
+          {" "}&middot;{" "}
+          <a
+            href="https://evmfs.xyz/1/25122671/0xf467b60f9b32dd6da2b538ed98899691b1da5b5678b32abf33c4be710128d46f/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "#a0a0aa", textDecoration: "underline", textUnderlineOffset: "3px" }}
+            title="Explore any EVMFS manifest by hash. Itself hosted on EVMFS V2 (Ethereum mainnet) — no server, no host, fully on-chain."
+          >
+            explorer
+          </a>
         </p>
       </footer>
     </div>

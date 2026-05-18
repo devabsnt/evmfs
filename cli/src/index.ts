@@ -23,6 +23,8 @@ program
   .option("--contract <address>", "EVMFS contract address", env.EVMFS_CONTRACT)
   .option("--gas-limit <limit>", "Max gas per transaction", env.EVMFS_GAS_LIMIT ?? "25000000")
   .option("--gateway <url>", "Gateway base URL", env.EVMFS_GATEWAY ?? "https://evmfs.xyz")
+  .option("--block-index <address>", "EVMFSBlockIndex contract address (overrides per-chain default)", env.EVMFS_BLOCK_INDEX)
+  .option("--no-block-index", "Skip auto-registering the manifest in EVMFSBlockIndex")
   .action((opts) => {
     if (!opts.rpc) { console.error("Error: --rpc or EVMFS_RPC is required"); process.exit(1); }
     if (!opts.privateKey) { console.error("Error: --private-key or EVMFS_PRIVATE_KEY is required"); process.exit(1); }
@@ -39,6 +41,8 @@ program
   .option("--contract <address>", "EVMFS contract address", env.EVMFS_CONTRACT)
   .option("--gas-limit <limit>", "Max gas per transaction", env.EVMFS_GAS_LIMIT ?? "25000000")
   .option("--gateway <url>", "Gateway base URL", env.EVMFS_GATEWAY ?? "https://evmfs.xyz")
+  .option("--block-index <address>", "EVMFSBlockIndex contract address (overrides per-chain default)", env.EVMFS_BLOCK_INDEX)
+  .option("--no-block-index", "Skip auto-registering the manifest in EVMFSBlockIndex")
   .action((opts) => {
     if (!opts.rpc) { console.error("Error: --rpc or EVMFS_RPC is required"); process.exit(1); }
     if (!opts.privateKey) { console.error("Error: --private-key or EVMFS_PRIVATE_KEY is required"); process.exit(1); }

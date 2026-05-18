@@ -17,6 +17,7 @@ import {
   ConfirmedChunk,
   UploadState,
 } from "./manifest.js";
+import { registerInBlockIndex, isV2Contract } from "./blockIndex.js";
 
 const EVMFS_ABI = [
   "function store(bytes calldata data) external returns (bytes32)",
@@ -33,6 +34,8 @@ interface UploadOptions {
   contract?: string;
   gasLimit: string;
   gateway: string;
+  blockIndex?: string;
+  noBlockIndex?: boolean;
 }
 
 function chunkKey(fileIndex: number, chunkIndex: number): string {
@@ -305,6 +308,23 @@ export async function uploadCommand(options: UploadOptions): Promise<void> {
     saveLocalManifest(entries, folder);
 
     console.log(`  Manifest confirmed in block ${receipt.blockNumber}`);
+
+    // Auto-register the manifest in EVMFSBlockIndex so future consumers can
+    // fetch by hash alone (no eth_getLogs scan required). Soft-fails — the
+    // upload itself already succeeded, so any registration error just logs
+    // a note and continues. Skipped automatically when uploading to V2,
+    // which records the block in its own storage.
+    if (!options.noBlockIndex && state.manifestHash && !isV2Contract(contractAddress)) {
+      await registerInBlockIndex({
+        wallet,
+        chainId: options.chainId,
+        manifestHash: state.manifestHash,
+        blockNumber: receipt.blockNumber,
+        contractOverride: options.blockIndex,
+      });
+    } else if (isV2Contract(contractAddress)) {
+      console.log(`  Block index: auto-recorded in V2.manifests at block ${receipt.blockNumber}`);
+    }
   }
 
   printResult(options, state);
@@ -337,6 +357,8 @@ interface DeployOptions {
   contract?: string;
   gasLimit: string;
   gateway: string;
+  blockIndex?: string;
+  noBlockIndex?: boolean;
 }
 
 export async function deployCommand(options: DeployOptions): Promise<void> {
@@ -606,6 +628,21 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     saveLocalManifest(entries, folder);
 
     console.log(`  Manifest confirmed in block ${receipt.blockNumber}`);
+
+    // Auto-register the manifest in EVMFSBlockIndex (see uploadCommand
+    // above for rationale). Skipped when uploading to V2 — V2 records
+    // (uploader, block) in its own storage so registration is redundant.
+    if (!options.noBlockIndex && state.manifestHash && !isV2Contract(contractAddress)) {
+      await registerInBlockIndex({
+        wallet,
+        chainId: options.chainId,
+        manifestHash: state.manifestHash,
+        blockNumber: receipt.blockNumber,
+        contractOverride: options.blockIndex,
+      });
+    } else if (isV2Contract(contractAddress)) {
+      console.log(`  Block index: auto-recorded in V2.manifests at block ${receipt.blockNumber}`);
+    }
   }
 
   printDeployResult(options, state, relativePaths);

@@ -109,22 +109,60 @@ func getBlockNumber(rpcURL string) (int64, error) {
 	return blockNum.Int64(), nil
 }
 
-func FetchContent(rpcURLs []string, contractAddress, chainId, contentHash string, blockHint int64) ([]byte, error) {
+// FetchContent tries each configured EVMFS contract address (e.g. V1 + V2)
+// in order, against each RPC. Returns the first match. Falls back to scan
+// only on the LAST address tried to avoid scanning the entire chain N times.
+func FetchContent(rpcURLs []string, contractAddresses []string, chainId, contentHash string, blockHint int64) ([]byte, error) {
 	if len(rpcURLs) == 0 {
 		return nil, fmt.Errorf("no RPC URLs configured")
 	}
-
-	var lastErr error
-	for _, rpcURL := range rpcURLs {
-		data, err := fetchFromRPC(rpcURL, contractAddress, chainId, contentHash, blockHint)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		return data, nil
+	if len(contractAddresses) == 0 {
+		return nil, fmt.Errorf("no EVMFS contract addresses configured")
 	}
 
-	return nil, fmt.Errorf("all RPC URLs failed, last error: %w", lastErr)
+	var lastErr error
+	// First pass: tight-window check at each contract address using only the
+	// blockHint. Cheap, only does scan on the final address attempt if all
+	// tight checks miss.
+	for i, contractAddress := range contractAddresses {
+		isLast := i == len(contractAddresses)-1
+		for _, rpcURL := range rpcURLs {
+			var data []byte
+			var err error
+			if isLast {
+				data, err = fetchFromRPC(rpcURL, contractAddress, chainId, contentHash, blockHint)
+			} else {
+				data, err = fetchFromRPCBlockHintOnly(rpcURL, contractAddress, contentHash, blockHint)
+			}
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			if data != nil {
+				return data, nil
+			}
+		}
+	}
+
+	if lastErr != nil {
+		return nil, fmt.Errorf("all RPC URLs failed across %d contract(s), last error: %w", len(contractAddresses), lastErr)
+	}
+	return nil, fmt.Errorf("content not found across %d contract(s)", len(contractAddresses))
+}
+
+// fetchFromRPCBlockHintOnly does just the tight-window check (no scan).
+// Used when probing multiple contract addresses — we don't want to scan
+// the entire chain N times.
+func fetchFromRPCBlockHintOnly(rpcURL, contractAddress, contentHash string, blockHint int64) ([]byte, error) {
+	if blockHint <= 0 {
+		return nil, nil // can't tight-check without a hint
+	}
+	from := blockHint - 1
+	if from < 0 {
+		from = 0
+	}
+	to := blockHint + 1
+	return fetchLogsInRange(rpcURL, contractAddress, contentHash, from, to)
 }
 
 func fetchFromRPC(rpcURL, contractAddress, chainId, contentHash string, blockHint int64) ([]byte, error) {

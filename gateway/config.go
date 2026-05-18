@@ -13,6 +13,14 @@ type Config struct {
 	CacheDir        string              `yaml:"cache_dir"`
 	RPCURLs         map[string][]string `yaml:"rpc_urls"`
 	ContractAddress string              `yaml:"contract_address"`
+	// ContractAddresses is the full list of EVMFS contract addresses to
+	// query. When set, supersedes ContractAddress. Allows the gateway to
+	// serve content from both V1 and V2 (and any future versions) without
+	// the caller needing to specify which. Tried in order; the first one
+	// that returns a log wins. Default: [ContractAddress, V2 address] when
+	// only the legacy single field is set, ensuring V1 + V2 both work
+	// out of the box.
+	ContractAddresses []string `yaml:"contract_addresses"`
 	StaticDir       string              `yaml:"static_dir"`
 	NamesContract   string              `yaml:"names_contract"`
 	NamesChainId    string              `yaml:"names_chain_id"`
@@ -41,6 +49,42 @@ func (c *Config) applyRewriteDefaults() {
 	}
 }
 
+// EVMFSV2 contract address (same on every chain via CREATE2).
+const evmfsV2Address = "0xb61cdCDC81d97c32122E668AE782b2327d0a623C"
+
+// applyContractDefaults derives ContractAddresses from the legacy single
+// ContractAddress field if the operator hasn't set an explicit list. The
+// resulting list contains V2 (tried first — recommended for new uploads)
+// followed by the configured V1 address (fallback for legacy content).
+// Operators with collections on a non-canonical contract can override the
+// whole list via `contract_addresses:` in YAML or CONTRACT_ADDRESSES env.
+func (c *Config) applyContractDefaults() {
+	if len(c.ContractAddresses) > 0 {
+		return // operator set an explicit list; respect it
+	}
+	var list []string
+	// V2 first — forward-looking. Most new content lives here.
+	list = append(list, evmfsV2Address)
+	// V1 fallback — legacy content (e.g. Skrumpeys) still works.
+	if c.ContractAddress != "" && !strings.EqualFold(c.ContractAddress, evmfsV2Address) {
+		list = append(list, c.ContractAddress)
+	}
+	c.ContractAddresses = list
+}
+
+// ResolvedContractAddresses returns the list of EVMFS contracts to query
+// for content lookups. Tools should iterate this list in order and use the
+// first match.
+func (c *Config) ResolvedContractAddresses() []string {
+	if len(c.ContractAddresses) > 0 {
+		return c.ContractAddresses
+	}
+	if c.ContractAddress != "" {
+		return []string{c.ContractAddress}
+	}
+	return nil
+}
+
 func LoadConfig() (*Config, error) {
 	cfg := &Config{
 		Port:         "8080",
@@ -57,6 +101,7 @@ func LoadConfig() (*Config, error) {
 			return nil, fmt.Errorf("failed to parse config.yaml: %w", err)
 		}
 		cfg.applyRewriteDefaults()
+		cfg.applyContractDefaults()
 		return cfg, nil
 	}
 
@@ -130,5 +175,6 @@ func LoadConfig() (*Config, error) {
 	}
 
 	cfg.applyRewriteDefaults()
+	cfg.applyContractDefaults()
 	return cfg, nil
 }

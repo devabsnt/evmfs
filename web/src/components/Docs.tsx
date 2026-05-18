@@ -269,10 +269,28 @@ https://evmfs.xyz/1/24826863/0xabc.../assets/style.css`}</CodeBlock>
 function DevsDocs({ chainName }: { chainName: string }) {
   return (
     <div>
-      <Section title="Contract address">
+      <Section title="Contract addresses">
+        <p style={{ margin: "0 0 8px", color: "#a0a0aa" }}>
+          <strong style={{ color: "#e0e0e0" }}>EVMFSV2</strong> (recommended for new uploads)
+        </p>
+        <CodeBlock>{`0xb61cdCDC81d97c32122E668AE782b2327d0a623C`}</CodeBlock>
+        <p style={{ margin: "10px 0 0" }}>
+          Deployed on Ethereum mainnet (chain ID <Code>1</Code>) and Monad mainnet (chain ID <Code>143</Code>) at the same address via CREATE2. <code>storeManifest()</code> records both the uploader and the block number in contract storage, so future readers can fetch by hash alone — no log scan required.
+        </p>
+        <p style={{ margin: "16px 0 8px", color: "#a0a0aa" }}>
+          <strong style={{ color: "#e0e0e0" }}>EVMFS V1</strong> (legacy — same Store event signature)
+        </p>
         <CodeBlock>{`0x140cbDFf649929D003091a5B8B3be34588753aBA`}</CodeBlock>
         <p style={{ margin: "10px 0 0" }}>
-          Deployed on Ethereum mainnet (chain ID <Code>1</Code>) and Monad mainnet (chain ID <Code>143</Code>) at the same address via CREATE2. Immutable, no admin, no upgrades.
+          The original contract. Records only the uploader, not the block. For block lookups on V1 content, use the BlockIndex sidecar (addresses below) or do an off-chain log scan.
+        </p>
+        <p style={{ margin: "16px 0 8px", color: "#a0a0aa" }}>
+          <strong style={{ color: "#e0e0e0" }}>EVMFSBlockIndex</strong> (sidecar for V1 hash → block lookups)
+        </p>
+        <CodeBlock>{`Ethereum mainnet:   0x85fce8503683a76371568f2f1347cf2c85dddc39
+Monad mainnet:      0x2b62d34557e7cb8cb31dc83d2132396d0ef5cad0`}</CodeBlock>
+        <p style={{ margin: "10px 0 0" }}>
+          Permissionless registry that maps V1 manifest hashes to their block numbers. Only the manifest uploader can register. Not needed for V2 content (V2 records the block natively).
         </p>
       </Section>
 
@@ -317,11 +335,28 @@ function DevsDocs({ chainName }: { chainName: string }) {
       </Section>
 
       <Section title="Contract ABI">
+        <p style={{ margin: "0 0 8px", color: "#a0a0aa" }}>
+          <strong style={{ color: "#e0e0e0" }}>V2</strong> (recommended)
+        </p>
+        <CodeBlock>{`function store(bytes calldata data) external returns (bytes32);
+function storeBatch(bytes[] calldata data) external returns (bytes32[]);
+function storeManifest(bytes calldata data) external returns (bytes32);
+function blockOf(bytes32 hash) external view returns (uint64);
+function uploaderOf(bytes32 hash) external view returns (address);
+event Store(bytes32 indexed contentHash, bytes data);
+struct ManifestRecord { address uploader; uint64 blockNumber; }
+mapping(bytes32 => ManifestRecord) public manifests;`}</CodeBlock>
+        <p style={{ margin: "16px 0 8px", color: "#a0a0aa" }}>
+          <strong style={{ color: "#e0e0e0" }}>V1</strong>
+        </p>
         <CodeBlock>{`function store(bytes calldata data) external returns (bytes32);
 function storeBatch(bytes[] calldata data) external returns (bytes32[]);
 function storeManifest(bytes calldata data) external returns (bytes32);
 event Store(bytes32 indexed contentHash, bytes data);
 mapping(bytes32 => address) public manifests;`}</CodeBlock>
+        <p style={{ margin: "10px 0 0" }}>
+          Both contracts emit the identical <Code>Store</Code> event signature, so any gateway, renderer, or lib that reads logs works the same way against either contract address.
+        </p>
       </Section>
 
       <Section title="Direct RPC fetch (no gateway required)">

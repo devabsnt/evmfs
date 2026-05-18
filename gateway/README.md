@@ -283,14 +283,22 @@ that domain).
 ## Configuration reference
 
 Every option is settable via YAML (`config.yaml`) or env var. Env vars
-override YAML when both are present. The EVMFS contract address is the
-same on every chain via CREATE2: `0x140cbDFf649929D003091a5B8B3be34588753aBA`.
+override YAML when both are present.
+
+EVMFS canonical contract addresses (same on every chain via CREATE2):
+
+- **EVMFSV2** (current, recommended): `0xb61cdCDC81d97c32122E668AE782b2327d0a623C`
+- **EVMFS V1** (legacy, still supported): `0x140cbDFf649929D003091a5B8B3be34588753aBA`
+
+The gateway queries V2 first, then V1, automatically. Operators do not need
+to configure both. V2 is built in.
 
 | YAML key             | Env var              | Default                   | Description                              |
 |----------------------|----------------------|---------------------------|------------------------------------------|
 | `port`               | `PORT`               | `8080`                    | TCP port to listen on                    |
 | `cache_dir`          | `CACHE_DIR`          | `./cache`                 | Filesystem cache directory               |
-| `contract_address`   | `CONTRACT_ADDRESS`   | _none_                    | EVMFS contract address (see above)       |
+| `contract_address`   | `CONTRACT_ADDRESS`   | _none_                    | Legacy single-contract field. V1 by default. V2 is appended automatically. |
+| `contract_addresses` | _N/A_                | `[V2, V1]`                | Full list of contracts to try in order. Overrides `contract_address` when set. |
 | `rpc_urls` (map)     | `RPC_URLS`           | _none_                    | Per-chain RPC URLs (see format below)    |
 | `static_dir`         | `STATIC_DIR`         | _none_                    | Optional static frontend served at `/`   |
 | `names_contract`     | `NAMES_CONTRACT`     | _none_                    | EVMFS-Names registry address             |
@@ -299,6 +307,21 @@ same on every chain via CREATE2: `0x140cbDFf649929D003091a5B8B3be34588753aBA`.
 | `rewrite_hosts`      | `REWRITE_HOSTS`      | `true`                    | Toggle the URL host rewriter             |
 | `rewrite_from_hosts` | `REWRITE_FROM_HOSTS` | `evmfs.xyz,www.evmfs.xyz` | Comma-separated source hosts to rewrite  |
 
+### How multi-contract lookup works
+
+For each request, the gateway tries each address in `contract_addresses` in
+order. Default order is V2 first, V1 second. Matches expected traffic:
+
+- New uploads land on V2. Hash lookups against V2 resolve in a single tight
+  `eth_getLogs` since V2 records the block in its own storage.
+- Legacy V1 content (Skrumpeys, the names site, etc.) is found on the
+  second attempt against V1's address. Adds one cheap RPC call per V1 hit.
+  No scan unless both contracts miss.
+
+Operators with custom deployments can override the list entirely via
+`contract_addresses`, or stick with `contract_address` and let the gateway
+auto-append V2.
+
 ### RPC URL env-var format
 
 ```bash
@@ -306,7 +329,7 @@ RPC_URLS="1=https://eth.publicnode.com,https://eth.llamarpc.com;143=https://rpc.
 ```
 
 Semicolons separate chains. Commas separate URLs within a chain.
-
+ 
 ### Default RPC suggestions (no API key required)
 
 These public endpoints work but are rate-limited. For non-trivial

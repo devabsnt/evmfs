@@ -1,0 +1,53 @@
+{
+  "$comment": "Canonical contract addresses for the EVMFS protocol. Same on every chain where deployed via CREATE2 (Safe Singleton Factory). Read by the lib, CLI, gateway, and web frontend for default configuration.",
+  "chains": {
+    "1": {
+      "name": "Ethereum mainnet",
+      "rpcDefaults": [
+        "https://ethereum-rpc.publicnode.com",
+        "https://eth.llamarpc.com",
+        "https://rpc.ankr.com/eth"
+      ],
+      "evmfs": "0x140cbDFf649929D003091a5B8B3be34588753aBA",
+      "evmfsV2": "0xb61cdCDC81d97c32122E668AE782b2327d0a623C",
+      "blockIndex": "0x85fce8503683a76371568f2f1347cf2c85dddc39",
+      "evmfsNames": "0x36043906ba7c191c9511a60a8b28e3a602ed1477"
+    },
+    "11155111": {
+      "name": "Sepolia",
+      "rpcDefaults": [
+        "https://ethereum-sepolia-rpc.publicnode.com",
+        "https://sepolia.drpc.org"
+      ],
+      "evmfs": "0x443E0EFed7Ca889e31f65b3a262999C88a1D470F"
+    },
+    "143": {
+      "name": "Monad mainnet",
+      "rpcDefaults": [
+        "https://rpc.monad.xyz",
+        "https://rpc1.monad.xyz",
+        "https://rpc2.monad.xyz",
+        "https://rpc-mainnet.monadinfra.com",
+        "https://monad-mainnet.drpc.org"
+      ],
+      "evmfs": "0x140cbDFf649929D003091a5B8B3be34588753aBA",
+      "evmfsV2": "0xb61cdCDC81d97c32122E668AE782b2327d0a623C",
+      "blockIndex": "0x2b62d34557e7cb8cb31dc83d2132396d0ef5cad0"
+    }
+  },
+  "canonical": {
+    "$comment": "Addresses that are guaranteed to be the same on every chain (via CREATE2). Tools can use these as defaults without needing per-chain lookup tables.",
+    "evmfs": "0x140cbDFf649929D003091a5B8B3be34588753aBA",
+    "evmfsV2": "0xb61cdCDC81d97c32122E668AE782b2327d0a623C",
+    "safeSingletonFactory": "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7"
+  },
+  "viewers": {
+    "$comment": "On-chain viewer stack — currently Monad mainnet only. Not part of the EVMFS protocol; built as a separate layer in the ON-CHAIN/ directory.",
+    "143": {
+      "evmfsRenderer": "0x906c18b4c45672fff5c4fbd7e15aa407eaf8fcf6",
+      "evmfsTokenViewer": "0x139EF7cFc40c6044229D8EcAEb38E1A18FB20D94",
+      "evmfsExplorerRenderer": "0xc7CeeDa653D4e5d40Ff611e2D9f55f65aDAE07aE",
+      "evmfsExplorer": "0x58777A7F247D39669E0659B10203776308B2ECfE"
+    }
+  }
+}

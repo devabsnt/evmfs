@@ -1,6 +1,7 @@
 import { fetchContent, STORE_EVENT_TOPIC } from "./rpc.js";
 import { tryGunzip } from "./decompress.js";
 import { verifyHash } from "./keccak256.js";
+import { defaultBlockIndex, lookupBlock } from "./blockIndex.js";
 import type { EVMFSOptions, ManifestEntry } from "./types.js";
 
 export type { EVMFSOptions, ManifestEntry };
@@ -10,22 +11,40 @@ const DEFAULT_CONTRACT = "0x0000000000000000000000000000000000000000";
 export class EVMFS {
   private rpcUrl: string;
   private contract: string;
+  private blockIndex?: string;
+  private chainId?: number;
 
   constructor(options: EVMFSOptions) {
     this.rpcUrl = options.rpc;
     this.contract = options.contract ?? DEFAULT_CONTRACT;
+    this.chainId = options.chainId;
+    this.blockIndex = options.blockIndex ?? defaultBlockIndex(options.chainId);
   }
 
   /**
-   * Fetch and parse the manifest for a given hash.
+   * Look up a manifest's block via the configured EVMFSBlockIndex contract.
+   * Returns 0 if no index is configured, the hash isn't registered, or any
+   * RPC error — callers should fall back to a log scan in that case.
    */
-  async manifest(manifestHash: string, manifestBlock: number): Promise<ManifestEntry[]> {
+  async resolveBlock(manifestHash: string): Promise<number> {
+    if (!this.blockIndex) return 0;
+    return lookupBlock(this.rpcUrl, this.blockIndex, manifestHash);
+  }
+
+  /**
+   * Fetch and parse the manifest for a given hash. If `manifestBlock` is
+   * omitted (or 0), the block is resolved via the configured BlockIndex;
+   * if that also fails the underlying fetcher does a log scan.
+   */
+  async manifest(manifestHash: string, manifestBlock?: number): Promise<ManifestEntry[]> {
+    let block = manifestBlock ?? 0;
+    if (!block) block = await this.resolveBlock(manifestHash);
     const raw = await fetchContent(
       this.rpcUrl,
       this.contract,
       STORE_EVENT_TOPIC,
       manifestHash,
-      manifestBlock
+      block
     );
     const decompressed = await tryGunzip(raw);
     const text = new TextDecoder().decode(decompressed);
@@ -34,8 +53,10 @@ export class EVMFS {
 
   /**
    * Fetch a single file by name or numeric index from a manifest.
+   * If `manifestBlock` is omitted, the block is resolved via the configured
+   * BlockIndex (with log-scan fallback inside the fetcher).
    */
-  async fetch(manifestHash: string, manifestBlock: number, path: string): Promise<Uint8Array> {
+  async fetch(manifestHash: string, manifestBlock: number | undefined, path: string): Promise<Uint8Array> {
     const entries = await this.manifest(manifestHash, manifestBlock);
     const entry = this.resolveEntry(entries, path);
     if (!entry) {
@@ -45,11 +66,12 @@ export class EVMFS {
   }
 
   /**
-   * Fetch all files in a manifest with concurrency control.
+   * Fetch all files in a manifest with concurrency control. Pass
+   * `manifestBlock = undefined` to auto-resolve via the BlockIndex.
    */
   async fetchAll(
     manifestHash: string,
-    manifestBlock: number,
+    manifestBlock: number | undefined,
     options?: {
       concurrency?: number;
       onProgress?: (completed: number, total: number) => void;
