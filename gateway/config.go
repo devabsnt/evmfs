@@ -164,5 +164,6 @@ func LoadConfig() (*Config, error) {
 
 	cfg.applyRewriteDefaults()
 	cfg.applyContractDefaults()
+	cfg.applyNamesDefaults()
 	return cfg, nil
 }
