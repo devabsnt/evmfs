@@ -40,7 +40,7 @@ func (c *Config) applyRewriteDefaults() {
 const evmfsV2Address = "0xb61cdCDC81d97c32122E668AE782b2327d0a623C"
 
 // Ethereum mainnet.
-const evmfsNamesV2Address = "0x86342282edF4A1c50249f16f4Cb11C5921455730"
+const evmfsNamesV2Address = "0x86342282EdF4A1C50249f16f4CB11c5921455730"
 
 func (c *Config) applyNamesDefaults() {
 	if c.NamesContract != "" && c.NamesContractV2 == "" {

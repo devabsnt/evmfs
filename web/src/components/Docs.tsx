@@ -397,7 +397,7 @@ docker run -p 8080:8080 \\
           <strong style={{ color: "#e0e0e0" }}>EVMFSNamesV2</strong> (current - registers names against V2 manifests)
         </p>
         <CodeBlock>{`// Ethereum mainnet
-0x86342282edF4A1c50249f16f4Cb11C5921455730
+0x86342282EdF4A1C50249f16f4CB11c5921455730
 
 function register(string name, bytes32 manifest) payable
 function update(string name, bytes32 manifest)
@@ -483,7 +483,7 @@ GATEWAY_DOMAIN=yourdomain.com
 
 # Optional - V2 names. Defaults to canonical V2 address when NAMES_CONTRACT
 # is set, so this is only needed to override.
-# NAMES_CONTRACT_V2=0x86342282edF4A1c50249f16f4Cb11C5921455730
+# NAMES_CONTRACT_V2=0x86342282EdF4A1C50249f16f4CB11c5921455730
 
 # DNS - add a wildcard CNAME pointing to your gateway
 *   CNAME   your-gateway-host.example.com`}</CodeBlock>

@@ -1,9 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
-import { parseEther, type WalletClient, type PublicClient, type Hex, zeroAddress, keccak256, toBytes } from "viem";
+import { parseEther, type WalletClient, type PublicClient, type Hex, zeroAddress } from "viem";
 import { discoverWallets, connectWallet, defaultPublicClient, type WalletInfo } from "./wallet";
-import { NAMES_ABI } from "./abi";
-
-const NAMES_CONTRACT = "0x36043906ba7c191c9511a60a8b28e3a602ed1477" as const;
+import {
+  NAMES_V1_ABI,
+  NAMES_V2_ABI,
+  NAMES_V1_ADDRESS,
+  NAMES_V2_ADDRESS,
+  namesAddress,
+  type ContractVersion,
+} from "./abi";
 
 type View = "guide" | "register" | "update" | "lookup";
 
@@ -15,6 +20,12 @@ export default function App() {
   const [wallets, setWallets] = useState<WalletInfo[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [connecting, setConnecting] = useState(false);
+
+  // V2 is the default. V1 is offered for legacy V1 manifests only - V2
+  // requires that the caller uploaded the manifest to EVMFSV2, so users
+  // with V1 content can't register on V2 unless they re-upload first.
+  const [registerVersion, setRegisterVersion] = useState<ContractVersion>("v2");
+  const [updateVersion, setUpdateVersion] = useState<ContractVersion>("v2");
 
   const [name, setName] = useState("");
   const [manifest, setManifest] = useState("");
@@ -59,22 +70,36 @@ export default function App() {
   }, []);
 
   const nameValid = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(name) && name.length <= 32;
-  const canRegister = !!walletClient && nameValid && manifest.startsWith("0x") && manifest.length === 66 && block.length > 0;
+  const manifestValid = manifest.startsWith("0x") && manifest.length === 66;
+  const blockRequired = registerVersion === "v1";
+  const canRegister =
+    !!walletClient && nameValid && manifestValid && (!blockRequired || block.length > 0);
 
   async function handleRegister() {
     if (!walletClient || !publicClient) return;
     setStatus("Sending transaction...");
     setTxHash("");
     try {
-      const hash = await walletClient.writeContract({
-        address: NAMES_CONTRACT,
-        abi: NAMES_ABI,
-        functionName: "register",
-        args: [name, BigInt(block), manifest as Hex],
-        value: parseEther("0.001"),
-        chain: walletClient.chain,
-        account: walletClient.account!,
-      });
+      const hash =
+        registerVersion === "v2"
+          ? await walletClient.writeContract({
+              address: NAMES_V2_ADDRESS,
+              abi: NAMES_V2_ABI,
+              functionName: "register",
+              args: [name, manifest as Hex],
+              value: parseEther("0.001"),
+              chain: walletClient.chain,
+              account: walletClient.account!,
+            })
+          : await walletClient.writeContract({
+              address: NAMES_V1_ADDRESS,
+              abi: NAMES_V1_ABI,
+              functionName: "register",
+              args: [name, BigInt(block), manifest as Hex],
+              value: parseEther("0.001"),
+              chain: walletClient.chain,
+              account: walletClient.account!,
+            });
       setTxHash(hash);
       setStatus("Waiting for confirmation...");
       await publicClient.waitForTransactionReceipt({ hash });
@@ -92,8 +117,10 @@ export default function App() {
     setUpdateOwner(null);
     try {
       const result = await client.readContract({
-        address: NAMES_CONTRACT, abi: NAMES_ABI,
-        functionName: "lookup", args: [updateName],
+        address: namesAddress(updateVersion),
+        abi: updateVersion === "v2" ? NAMES_V2_ABI : NAMES_V1_ABI,
+        functionName: "lookup",
+        args: [updateName],
       });
       const [owner] = result;
       setUpdateOwner(owner as string);
@@ -104,19 +131,35 @@ export default function App() {
   }
 
   const isUpdateOwner = updateOwner !== null && updateOwner !== zeroAddress && address && updateOwner.toLowerCase() === address.toLowerCase();
-  const canUpdate = isUpdateOwner && updateManifest.startsWith("0x") && updateManifest.length === 66 && updateBlock.length > 0;
+  const updateBlockRequired = updateVersion === "v1";
+  const canUpdate =
+    isUpdateOwner &&
+    updateManifest.startsWith("0x") &&
+    updateManifest.length === 66 &&
+    (!updateBlockRequired || updateBlock.length > 0);
 
   async function handleUpdate() {
     if (!walletClient || !publicClient) return;
     setUpdateStatus("Sending transaction...");
     try {
-      const hash = await walletClient.writeContract({
-        address: NAMES_CONTRACT, abi: NAMES_ABI,
-        functionName: "update",
-        args: [updateName, BigInt(updateBlock), updateManifest as Hex],
-        chain: walletClient.chain,
-        account: walletClient.account!,
-      });
+      const hash =
+        updateVersion === "v2"
+          ? await walletClient.writeContract({
+              address: NAMES_V2_ADDRESS,
+              abi: NAMES_V2_ABI,
+              functionName: "update",
+              args: [updateName, updateManifest as Hex],
+              chain: walletClient.chain,
+              account: walletClient.account!,
+            })
+          : await walletClient.writeContract({
+              address: NAMES_V1_ADDRESS,
+              abi: NAMES_V1_ABI,
+              functionName: "update",
+              args: [updateName, BigInt(updateBlock), updateManifest as Hex],
+              chain: walletClient.chain,
+              account: walletClient.account!,
+            });
       setUpdateStatus("Waiting for confirmation...");
       await publicClient.waitForTransactionReceipt({ hash });
       setUpdateStatus(`Updated! ${updateName}.evmfs.xyz now points to the new manifest.`);
@@ -126,28 +169,35 @@ export default function App() {
     }
   }
 
+  const [lookupSource, setLookupSource] = useState<ContractVersion | null>(null);
+
   async function handleLookup() {
     const client = publicClient ?? defaultPublicClient;
     if (!client) return;
     setLookupResult(null);
     setLookupError("");
+    setLookupSource(null);
+    // Mirror the gateway's V2-first, V1-fallback resolution order.
     try {
-      const result = await client.readContract({
-        address: NAMES_CONTRACT,
-        abi: NAMES_ABI,
-        functionName: "lookup",
-        args: [lookupName],
-      });
-      const [owner, blockNum, manifestHash] = result;
-      if (owner === zeroAddress) {
-        setLookupError("Available - this name hasn't been claimed yet");
-      } else {
-        setLookupResult({
-          owner: owner as string,
-          block: blockNum as bigint,
-          manifest: manifestHash as string,
+      for (const v of ["v2", "v1"] as const) {
+        const result = await client.readContract({
+          address: namesAddress(v),
+          abi: v === "v2" ? NAMES_V2_ABI : NAMES_V1_ABI,
+          functionName: "lookup",
+          args: [lookupName],
         });
+        const [owner, blockNum, manifestHash] = result;
+        if (owner !== zeroAddress) {
+          setLookupSource(v);
+          setLookupResult({
+            owner: owner as string,
+            block: blockNum as bigint,
+            manifest: manifestHash as string,
+          });
+          return;
+        }
       }
+      setLookupError("Available - this name hasn't been claimed on V2 or V1");
     } catch {
       setLookupError("Lookup failed");
     }
@@ -237,6 +287,7 @@ export default function App() {
                 <div style={s.listItem}>The gateway resolves names on-chain - no databases, no middlemen</div>
                 <div style={s.listItem}>Registration costs <strong>0.001 ETH</strong>, one-time, no renewals ever</div>
                 <div style={s.listItem}>Use your own domain via Cloudflare or any reverse proxy - <a href="https://evmfs.xyz" target="_blank" rel="noopener noreferrer" style={s.link}>full guide in docs</a></div>
+                <div style={s.listItem}>Two contracts coexist: <strong>V2</strong> (default, no block arg needed - reads it from EVMFSV2) and <strong>V1</strong> (legacy). V2 cannot squat V1 names owned by someone else.</div>
               </div>
             </div>
             <div style={s.guideSection}>
@@ -281,6 +332,15 @@ export default function App() {
         {view === "register" && (
           <div style={s.panel}>
             <div style={s.field}>
+              <label style={s.label}>Contract</label>
+              <VersionToggle value={registerVersion} onChange={setRegisterVersion} />
+              <div style={s.hint}>
+                {registerVersion === "v2"
+                  ? "V2 (recommended). Requires the manifest to be uploaded via EVMFSV2 by your wallet."
+                  : "V1 (legacy). Use only if your manifest is on the original EVMFS contract."}
+              </div>
+            </div>
+            <div style={s.field}>
               <label style={s.label}>Name</label>
               <div style={s.inputRow}>
                 <input value={name} onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
@@ -293,10 +353,12 @@ export default function App() {
               <label style={s.label}>Manifest hash</label>
               <input value={manifest} onChange={(e) => setManifest(e.target.value)} placeholder="0x..." style={s.input} />
             </div>
-            <div style={s.field}>
-              <label style={s.label}>Block number</label>
-              <input value={block} onChange={(e) => setBlock(e.target.value.replace(/\D/g, ""))} placeholder="24826863" style={s.input} />
-            </div>
+            {registerVersion === "v1" && (
+              <div style={s.field}>
+                <label style={s.label}>Block number</label>
+                <input value={block} onChange={(e) => setBlock(e.target.value.replace(/\D/g, ""))} placeholder="24826863" style={s.input} />
+              </div>
+            )}
             <div style={s.field}>
               <div style={s.feeRow}><span style={s.dim}>Registration fee</span><span>0.001 ETH</span></div>
             </div>
@@ -317,6 +379,18 @@ export default function App() {
         {view === "update" && (
           <div style={s.panel}>
             <div style={s.field}>
+              <label style={s.label}>Contract</label>
+              <VersionToggle
+                value={updateVersion}
+                onChange={(v) => { setUpdateVersion(v); setUpdateOwner(null); setUpdateStatus(""); }}
+              />
+              <div style={s.hint}>
+                {updateVersion === "v2"
+                  ? "Update a V2-registered name to point at a new V2 manifest."
+                  : "Update a V1-registered name."}
+              </div>
+            </div>
+            <div style={s.field}>
               <label style={s.label}>Name to update</label>
               <div style={s.inputRow}>
                 <input value={updateName}
@@ -333,7 +407,7 @@ export default function App() {
             </button>
 
             {updateOwner !== null && updateOwner === zeroAddress && (
-              <div style={s.status}><span style={{ color: "#d05050" }}>Name not registered</span></div>
+              <div style={s.status}><span style={{ color: "#d05050" }}>Name not registered on {updateVersion.toUpperCase()}</span></div>
             )}
 
             {updateOwner !== null && updateOwner !== zeroAddress && !isUpdateOwner && (
@@ -348,11 +422,13 @@ export default function App() {
                   <input value={updateManifest} onChange={(e) => setUpdateManifest(e.target.value)}
                     placeholder="0x..." style={s.input} />
                 </div>
-                <div style={s.field}>
-                  <label style={s.label}>New block number</label>
-                  <input value={updateBlock} onChange={(e) => setUpdateBlock(e.target.value.replace(/\D/g, ""))}
-                    placeholder="24826863" style={s.input} />
-                </div>
+                {updateVersion === "v1" && (
+                  <div style={s.field}>
+                    <label style={s.label}>New block number</label>
+                    <input value={updateBlock} onChange={(e) => setUpdateBlock(e.target.value.replace(/\D/g, ""))}
+                      placeholder="24826863" style={s.input} />
+                  </div>
+                )}
                 <button onClick={handleUpdate} disabled={!canUpdate}
                   style={{ ...s.button, ...(canUpdate ? {} : s.buttonDisabled) }}>
                   Update
@@ -381,6 +457,7 @@ export default function App() {
             )}
             {lookupResult && (
               <div style={s.result}>
+                <div style={s.resultRow}><span style={s.dim}>Registry</span><span>{(lookupSource ?? "v2").toUpperCase()}</span></div>
                 <div style={s.resultRow}><span style={s.dim}>Owner</span><span style={{ fontSize: 12 }}>{lookupResult.owner}</span></div>
                 <div style={s.resultRow}><span style={s.dim}>Block</span><span>{lookupResult.block.toString()}</span></div>
                 <div style={s.resultRow}><span style={s.dim}>Manifest</span><span style={{ wordBreak: "break-all", fontSize: 12 }}>{lookupResult.manifest}</span></div>
@@ -401,6 +478,22 @@ export default function App() {
         <span style={s.dim}> · </span>
         <a href="https://names.evmfs.xyz" style={s.link}>names.evmfs.xyz</a>
       </footer>
+    </div>
+  );
+}
+
+function VersionToggle({ value, onChange }: { value: ContractVersion; onChange: (v: ContractVersion) => void }) {
+  return (
+    <div style={s.versionRow}>
+      {(["v2", "v1"] as const).map((v) => (
+        <button
+          key={v}
+          onClick={() => onChange(v)}
+          style={{ ...s.versionBtn, ...(value === v ? s.versionBtnActive : {}) }}
+        >
+          {v.toUpperCase()}
+        </button>
+      ))}
     </div>
   );
 }
@@ -452,4 +545,8 @@ const s: Record<string, React.CSSProperties> = {
   guideList: { fontSize: 13, color: "#8a8a94" },
   listItem: { padding: "6px 0", borderBottom: "1px solid #1e1e22", lineHeight: 1.6 },
   footer: { borderTop: "1px solid #222228", padding: "16px 24px", textAlign: "center" as const, fontSize: 12 },
+  versionRow: { display: "flex", gap: 0, border: "1px solid #2a2a30", width: "fit-content" },
+  versionBtn: { padding: "6px 14px", background: "transparent", color: "#606068", border: "none", fontSize: 12, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600, cursor: "pointer", letterSpacing: "0.04em" },
+  versionBtnActive: { background: "#1a1a1e", color: "#d4d4da" },
+  hint: { color: "#606068", fontSize: 11, marginTop: 6, lineHeight: 1.5 },
 };

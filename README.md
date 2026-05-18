@@ -251,7 +251,7 @@ Same address on every chain via CREATE2 deployment through the Safe Singleton Fa
 
 Two contracts coexist. Gateways query V2 first, fall back to V1.
 
-- **EVMFSNamesV2** (current): `0x86342282edF4A1c50249f16f4Cb11C5921455730` - registers names against V2 manifests. Cross-checks V1 at registration time so V1 names cannot be squatted on V2 by a third party. V1 name owners can register the same name on V2 and "upgrade" to V2 content.
+- **EVMFSNamesV2** (current): `0x86342282EdF4A1C50249f16f4CB11c5921455730` - registers names against V2 manifests. Cross-checks V1 at registration time so V1 names cannot be squatted on V2 by a third party. V1 name owners can register the same name on V2 and "upgrade" to V2 content.
 - **EVMFSNames V1** (legacy): `0x36043906ba7c191c9511a60a8b28e3a602ed1477` - still the contract used by the [names.evmfs.xyz](https://names.evmfs.xyz) UI and the `evmfs register` CLI command, both of which target V1 manifests. Names registered here continue to resolve through every gateway.
 
 ### EVMFSBlockIndex (sidecar for V1 content)

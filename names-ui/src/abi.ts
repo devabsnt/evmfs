@@ -133,7 +133,7 @@ export const NAMES_V1_ABI = [
 // Backwards compat for any external imports of NAMES_ABI.
 export const NAMES_ABI = NAMES_V1_ABI;
 
-export const NAMES_V2_ADDRESS = "0x86342282edF4A1c50249f16f4Cb11C5921455730" as const;
+export const NAMES_V2_ADDRESS = "0x86342282EdF4A1C50249f16f4CB11c5921455730" as const;
 export const NAMES_V1_ADDRESS = "0x36043906ba7c191c9511a60a8b28e3a602ed1477" as const;
 
 export type ContractVersion = "v2" | "v1";
