@@ -56,6 +56,18 @@ const defaultMaxBlockRange int64 = 50000
 
 const fallbackScanWindowCap = 200
 
+// EVMFSBlockIndex deployments — hash -> block sidecar for V1 content.
+// Same selector (blockOf) is also exposed by EVMFSV2 directly, so a V2 hash
+// can be looked up against the V2 contract address instead. We always try the
+// sidecar first; V2 lookups are handled by passing the V2 address.
+var blockIndexByChain = map[string]string{
+	"1":   "0x85fce8503683a76371568f2f1347cf2c85dddc39",
+	"143": "0x2b62d34557e7cb8cb31dc83d2132396d0ef5cad0",
+}
+
+// keccak256("blockOf(bytes32)")[:4]
+const blockOfSelector = "0x7ee64074"
+
 func maxBlockRangeFor(chainId string) int64 {
 	if v, ok := maxBlockRangeByChain[chainId]; ok {
 		return v
@@ -119,6 +131,19 @@ func FetchContent(rpcURLs []string, contractAddresses []string, chainId, content
 		return nil, fmt.Errorf("no EVMFS contract addresses configured")
 	}
 
+	// Without a block hint, try the chain's BlockIndex sidecar before any
+	// scan. One eth_call per RPC until one returns a non-zero block.
+	if blockHint <= 0 {
+		if indexAddr := blockIndexByChain[chainId]; indexAddr != "" {
+			for _, rpcURL := range rpcURLs {
+				if hinted := lookupBlockOf(rpcURL, indexAddr, contentHash); hinted > 0 {
+					blockHint = hinted
+					break
+				}
+			}
+		}
+	}
+
 	var lastErr error
 	for i, contractAddress := range contractAddresses {
 		isLast := i == len(contractAddresses)-1
@@ -144,6 +169,61 @@ func FetchContent(rpcURLs []string, contractAddresses []string, chainId, content
 		return nil, fmt.Errorf("all RPC URLs failed across %d contract(s), last error: %w", len(contractAddresses), lastErr)
 	}
 	return nil, fmt.Errorf("content not found across %d contract(s)", len(contractAddresses))
+}
+
+// lookupBlockOf calls blockOf(bytes32) on a BlockIndex (or V2) contract and
+// returns the registered block, or 0 if unregistered / RPC error. Caller
+// treats 0 as "no hint, fall back to scan".
+func lookupBlockOf(rpcURL, indexAddress, contentHash string) int64 {
+	if indexAddress == "" {
+		return 0
+	}
+	clean := strings.TrimPrefix(contentHash, "0x")
+	if len(clean) != 64 {
+		return 0
+	}
+
+	req := jsonRPCRequest{
+		JSONRPC: "2.0",
+		Method:  "eth_call",
+		Params: []interface{}{
+			map[string]string{"to": indexAddress, "data": blockOfSelector + clean},
+			"latest",
+		},
+		ID: 1,
+	}
+	reqBody, err := json.Marshal(req)
+	if err != nil {
+		return 0
+	}
+	resp, err := http.Post(rpcURL, "application/json", bytes.NewReader(reqBody))
+	if err != nil {
+		return 0
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0
+	}
+
+	var rpcResp jsonRPCResponse
+	if err := json.Unmarshal(body, &rpcResp); err != nil {
+		return 0
+	}
+	if rpcResp.Error != nil || len(rpcResp.Result) == 0 {
+		return 0
+	}
+
+	var hexResult string
+	if err := json.Unmarshal(rpcResp.Result, &hexResult); err != nil {
+		return 0
+	}
+	n, ok := new(big.Int).SetString(strings.TrimPrefix(hexResult, "0x"), 16)
+	if !ok {
+		return 0
+	}
+	return n.Int64()
 }
 
 // fetchFromRPCBlockHintOnly does the tight-window check only, no scan.
