@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -28,6 +29,10 @@ type Config struct {
 
 	// Defaults to ["evmfs.xyz", "www.evmfs.xyz"] when RewriteHosts is on and unset.
 	RewriteFromHosts []string `yaml:"rewrite_from_hosts"`
+
+	// Per-IP rate limit. RateLimitRPS=0 disables. Burst defaults to RPS*4.
+	RateLimitRPS   int `yaml:"rate_limit_rps"`
+	RateLimitBurst int `yaml:"rate_limit_burst"`
 }
 
 func (c *Config) applyRewriteDefaults() {
@@ -138,6 +143,17 @@ func LoadConfig() (*Config, error) {
 		cfg.RewriteFromHosts = hosts
 	}
 
+	if v := os.Getenv("RATE_LIMIT_RPS"); v != "" {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n >= 0 {
+			cfg.RateLimitRPS = n
+		}
+	}
+	if v := os.Getenv("RATE_LIMIT_BURST"); v != "" {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n >= 0 {
+			cfg.RateLimitBurst = n
+		}
+	}
+
 	if rpcURLsEnv := os.Getenv("RPC_URLS"); rpcURLsEnv != "" {
 		chains := strings.Split(rpcURLsEnv, ";")
 		for _, chain := range chains {
@@ -165,5 +181,12 @@ func LoadConfig() (*Config, error) {
 	cfg.applyRewriteDefaults()
 	cfg.applyContractDefaults()
 	cfg.applyNamesDefaults()
+	cfg.applyRateLimitDefaults()
 	return cfg, nil
+}
+
+func (c *Config) applyRateLimitDefaults() {
+	if c.RateLimitRPS > 0 && c.RateLimitBurst <= 0 {
+		c.RateLimitBurst = c.RateLimitRPS * 4
+	}
 }

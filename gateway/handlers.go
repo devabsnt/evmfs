@@ -20,11 +20,12 @@ const multipartFetchConcurrency = 8
 var contentHashRegex = regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
 
 type Server struct {
-	Config    *Config
-	Cache     *Cache
-	NameCache *NameCache
-	staticFS  http.Handler
-	hasStatic bool
+	Config      *Config
+	Cache       *Cache
+	NameCache   *NameCache
+	staticFS    http.Handler
+	hasStatic   bool
+	rateLimiter *RateLimiter
 }
 
 func NewServer(cfg *Config, cache *Cache) *Server {
@@ -36,6 +37,10 @@ func NewServer(cfg *Config, cache *Cache) *Server {
 	if cfg.StaticDir != "" {
 		s.staticFS = http.FileServer(http.Dir(cfg.StaticDir))
 		s.hasStatic = true
+	}
+	if cfg.RateLimitRPS > 0 {
+		s.rateLimiter = NewRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst)
+		log.Printf("Rate limiter: %d req/s per IP, burst %d", cfg.RateLimitRPS, cfg.RateLimitBurst)
 	}
 	return s
 }
@@ -73,6 +78,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	trailingSlash := strings.HasSuffix(rawPath, "/") && rawPath != "/"
 	urlPath := strings.TrimSuffix(rawPath, "/")
 	segments := strings.Split(strings.TrimPrefix(urlPath, "/"), "/")
+
+	// Rate limit non-health requests by client IP. /health must always pass
+	// for CF LB monitor + Render readiness checks.
+	if s.rateLimiter != nil && urlPath != "/health" {
+		if !s.rateLimiter.Allow(clientIP(r)) {
+			w.Header().Set("Retry-After", "10")
+			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
+			return
+		}
+	}
 
 	switch {
 	case r.Method == http.MethodGet && urlPath == "/health":
