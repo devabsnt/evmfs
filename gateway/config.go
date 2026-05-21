@@ -84,15 +84,11 @@ func LoadConfig() (*Config, error) {
 		RewriteHosts: true,
 	}
 
-	data, err := os.ReadFile("config.yaml")
-	if err == nil {
+	// YAML provides baseline defaults if present; env vars below override.
+	if data, err := os.ReadFile("config.yaml"); err == nil {
 		if err := yaml.Unmarshal(data, cfg); err != nil {
 			return nil, fmt.Errorf("failed to parse config.yaml: %w", err)
 		}
-		cfg.applyRewriteDefaults()
-		cfg.applyContractDefaults()
-		cfg.applyNamesDefaults()
-		return cfg, nil
 	}
 
 	if port := os.Getenv("PORT"); port != "" {
